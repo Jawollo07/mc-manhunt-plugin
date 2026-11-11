@@ -1,13 +1,17 @@
 package de.jawollo07.manhunt;
 
 import de.jawollo07.manhunt.game.GameManager;
+import de.jawollo07.manhunt.player.PlayerManager;
 import de.jawollo07.manhunt.storage.ConfigManager;
 import de.jawollo07.manhunt.storage.StorageManager;
+import de.jawollo07.manhunt.teams.TeamManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ManHuntPlugin extends JavaPlugin {
     private ConfigManager configManager;
     private GameManager gameManager;
+    private PlayerManager playerManager;
+    private TeamManager teamManager;
     private StorageManager storageManager;
 
     @Override
@@ -16,6 +20,8 @@ public final class ManHuntPlugin extends JavaPlugin {
 
         configManager = new ConfigManager(this);
         gameManager = new GameManager();
+        playerManager = new PlayerManager();
+        teamManager = new TeamManager();
         storageManager = new StorageManager(this, configManager);
 
         try {
@@ -37,15 +43,9 @@ public final class ManHuntPlugin extends JavaPlugin {
         getLogger().info("ManHuntPlugin disabled.");
     }
 
-    public ConfigManager getConfigManager() {
-        return configManager;
-    }
-
-    public GameManager getGameManager() {
-        return gameManager;
-    }
-
-    public StorageManager getStorageManager() {
-        return storageManager;
-    }
+    public ConfigManager getConfigManager() { return configManager; }
+    public GameManager getGameManager() { return gameManager; }
+    public PlayerManager getPlayerManager() { return playerManager; }
+    public TeamManager getTeamManager() { return teamManager; }
+    public StorageManager getStorageManager() { return storageManager; }
 }
