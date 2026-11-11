@@ -1,6 +1,7 @@
 package de.jawollo07.manhunt;
 
 import de.jawollo07.manhunt.game.GameManager;
+import de.jawollo07.manhunt.modes.GameModeRegistry;
 import de.jawollo07.manhunt.player.PlayerManager;
 import de.jawollo07.manhunt.storage.ConfigManager;
 import de.jawollo07.manhunt.storage.StorageManager;
@@ -10,6 +11,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class ManHuntPlugin extends JavaPlugin {
     private ConfigManager configManager;
     private GameManager gameManager;
+    private GameModeRegistry gameModeRegistry;
     private PlayerManager playerManager;
     private TeamManager teamManager;
     private StorageManager storageManager;
@@ -20,6 +22,7 @@ public final class ManHuntPlugin extends JavaPlugin {
 
         configManager = new ConfigManager(this);
         gameManager = new GameManager();
+        gameModeRegistry = new GameModeRegistry();
         playerManager = new PlayerManager();
         teamManager = new TeamManager();
         storageManager = new StorageManager(this, configManager);
@@ -45,6 +48,7 @@ public final class ManHuntPlugin extends JavaPlugin {
 
     public ConfigManager getConfigManager() { return configManager; }
     public GameManager getGameManager() { return gameManager; }
+    public GameModeRegistry getGameModeRegistry() { return gameModeRegistry; }
     public PlayerManager getPlayerManager() { return playerManager; }
     public TeamManager getTeamManager() { return teamManager; }
     public StorageManager getStorageManager() { return storageManager; }
