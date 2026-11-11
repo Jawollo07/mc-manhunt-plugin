@@ -1,21 +1,23 @@
 package de.jawollo07.manhunt.player;
 
-import java.util.UUID;
-import org.bukkit.entity.Player;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 
-public class PlayerManager {
-    public void addPlayer(UUID playerId) {
+import java.util.Optional;
+import java.util.UUID;
 
+public final class PlayerManager {
+    public Optional<Player> findOnlinePlayer(UUID playerId) {
+        return Optional.ofNullable(Bukkit.getPlayer(playerId));
     }
-    public void removePlayer(UUID playerId) {
 
+    public Player requireOnlinePlayer(UUID playerId) {
+        return findOnlinePlayer(playerId).orElseThrow(
+                () -> new IllegalArgumentException("Player is not online: " + playerId)
+        );
     }
-    public Player getPlayer(UUID playerId) {
-        Player player = Bukkit.getPlayer(playerId);
-        if (player == null) {
-            throw new IllegalArgumentException("Player with ID " + playerId + " not found.");
-        }
-        return player;
+
+    public boolean isOnline(UUID playerId) {
+        return Bukkit.getPlayer(playerId) != null;
     }
 }
