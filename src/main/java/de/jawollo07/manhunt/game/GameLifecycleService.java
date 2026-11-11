@@ -20,6 +20,9 @@ public final class GameLifecycleService {
                 && game.getState() != GameState.COUNTDOWN) {
             throw new IllegalStateException("Game cannot be prepared from state " + game.getState());
         }
+        if (game.getPlayerCount() < game.getSettings().minPlayers()) {
+            throw new IllegalStateException("Not enough players to prepare this game");
+        }
         game.getMode().onPrepare(game);
         gameManager.transition(GameState.STARTING);
     }
