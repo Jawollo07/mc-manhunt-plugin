@@ -44,6 +44,14 @@ public final class ManHuntPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (playerSnapshotService != null) {
+            for (org.bukkit.entity.Player player : getServer().getOnlinePlayers()) {
+                try {
+                    playerSnapshotService.restore(player);
+                } catch (RuntimeException exception) {
+                    getLogger().severe("Could not restore player " + player.getUniqueId()
+                            + " during shutdown: " + exception.getMessage());
+                }
+            }
             playerSnapshotService.clear();
         }
         if (storageManager != null) {
