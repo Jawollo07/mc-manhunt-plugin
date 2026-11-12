@@ -21,6 +21,7 @@ public final class Game {
     private final Arena arena;
     private final GameSettings settings;
     private final Map<UUID, GamePlayer> players = new LinkedHashMap<>();
+    private final RoleManager roleManager = new RoleManager();
 
     private GameState state = GameState.WAITING;
     private MapInstance mapInstance;
@@ -41,6 +42,7 @@ public final class Game {
     public GameMode getMode() { return mode; }
     public Arena getArena() { return arena; }
     public GameSettings getSettings() { return settings; }
+    public RoleManager getRoleManager() { return roleManager; }
     public GameState getState() { return state; }
     public boolean isRunning() { return state == GameState.RUNNING; }
     public boolean isTerminal() { return state == GameState.RESETTING; }
