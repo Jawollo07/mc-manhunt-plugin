@@ -34,4 +34,19 @@ class GameInstanceIsolationTest {
         assertTrue(first.getTeamManager().getTeamOf(player).isPresent());
         assertTrue(second.getTeamManager().getTeamOf(player).isEmpty());
     }
+
+    @Test
+    void removingParticipantAlsoRemovesTheirRoleAndTeamMembership() {
+        Game game = newGame();
+        UUID player = UUID.randomUUID();
+        game.addPlayer(new GamePlayer(player));
+        var team = game.getTeamManager().createTeam("Runners", "GREEN", 4, false);
+        game.getTeamManager().assignPlayer(player, team.getId());
+        game.getRoleManager().assign(player, "runner");
+
+        assertTrue(game.removePlayer(player).isPresent());
+        assertFalse(game.getRoleManager().hasAssignment(player));
+        assertTrue(game.getTeamManager().getTeamOf(player).isEmpty());
+        assertTrue(game.removePlayer(player).isEmpty());
+    }
 }
