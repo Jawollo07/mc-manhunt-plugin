@@ -42,6 +42,44 @@ public final class GameLifecycleService {
         game.getMode().onEnd(game);
     }
 
+    public void playerJoined(java.util.UUID playerId) {
+        Game game = requireGame();
+        GamePlayer player = game.getPlayer(playerId).orElseThrow(
+                () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
+        );
+        game.getMode().onPlayerJoin(game, player);
+    }
+
+    public void playerQuit(java.util.UUID playerId) {
+        Game game = requireGame();
+        GamePlayer player = game.getPlayer(playerId).orElseThrow(
+                () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
+        );
+        player.setStatus(de.jawollo07.manhunt.player.PlayerStatus.DISCONNECTED);
+        game.getMode().onPlayerQuit(game, player);
+    }
+
+    public void playerDied(java.util.UUID playerId, java.util.UUID killerId) {
+        Game game = requireGame();
+        if (game.getState() != GameState.RUNNING) {
+            throw new IllegalStateException("Deaths can only be processed while the game is running");
+        }
+        GamePlayer player = game.getPlayer(playerId).orElseThrow(
+                () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
+        );
+        game.getMode().onPlayerDeath(game, player, killerId);
+    }
+
+    public void tick(long elapsedSeconds) {
+        if (elapsedSeconds < 0) {
+            throw new IllegalArgumentException("elapsedSeconds must not be negative");
+        }
+        Game game = requireGame();
+        if (game.getState() == GameState.RUNNING) {
+            game.getMode().onTick(game, elapsedSeconds);
+        }
+    }
+
     public void beginReset() {
         gameManager.beginReset();
     }
