@@ -3,6 +3,7 @@ package de.jawollo07.manhunt.game;
 import de.jawollo07.manhunt.arena.Arena;
 import de.jawollo07.manhunt.map.MapInstance;
 import de.jawollo07.manhunt.modes.GameMode;
+import de.jawollo07.manhunt.teams.TeamManager;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -22,6 +23,7 @@ public final class Game {
     private final GameSettings settings;
     private final Map<UUID, GamePlayer> players = new LinkedHashMap<>();
     private final RoleManager roleManager = new RoleManager();
+    private final TeamManager teamManager = new TeamManager();
 
     private GameState state = GameState.WAITING;
     private MapInstance mapInstance;
@@ -43,6 +45,7 @@ public final class Game {
     public Arena getArena() { return arena; }
     public GameSettings getSettings() { return settings; }
     public RoleManager getRoleManager() { return roleManager; }
+    public TeamManager getTeamManager() { return teamManager; }
     public GameState getState() { return state; }
     public boolean isRunning() { return state == GameState.RUNNING; }
     public boolean isTerminal() { return state == GameState.RESETTING; }
