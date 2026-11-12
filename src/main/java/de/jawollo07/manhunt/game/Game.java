@@ -106,7 +106,13 @@ public final class Game {
     }
 
     public Optional<GamePlayer> removePlayer(UUID playerId) {
-        return Optional.ofNullable(players.remove(playerId));
+        Objects.requireNonNull(playerId, "playerId");
+        GamePlayer removed = players.remove(playerId);
+        if (removed != null) {
+            roleManager.remove(playerId);
+            teamManager.removePlayer(playerId);
+        }
+        return Optional.ofNullable(removed);
     }
 
     void setMapInstance(MapInstance mapInstance) {
