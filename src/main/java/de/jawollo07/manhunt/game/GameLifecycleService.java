@@ -47,6 +47,7 @@ public final class GameLifecycleService {
         GamePlayer player = game.getPlayer(playerId).orElseThrow(
                 () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
         );
+        player.reconnect();
         game.getMode().onPlayerJoin(game, player);
     }
 
@@ -55,7 +56,7 @@ public final class GameLifecycleService {
         GamePlayer player = game.getPlayer(playerId).orElseThrow(
                 () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
         );
-        player.setStatus(de.jawollo07.manhunt.player.PlayerStatus.DISCONNECTED);
+        player.disconnect();
         game.getMode().onPlayerQuit(game, player);
     }
 
