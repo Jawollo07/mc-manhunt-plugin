@@ -20,8 +20,8 @@ class RoleManagerTest {
         assertEquals("assassin_hunter", manager.getRoleId(player).orElseThrow());
         assertEquals(team, manager.getAssignment(player).orElseThrow().teamId());
         assertEquals(1, manager.size());
-        assertNotEquals(first.assignedAt(), null);
-        assertNotEquals(second.assignedAt(), null);
+        assertNotNull(first.assignedAt());
+        assertNotNull(second.assignedAt());
     }
 
     @Test
