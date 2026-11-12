@@ -4,6 +4,7 @@ import de.jawollo07.manhunt.game.GameLifecycleService;
 import de.jawollo07.manhunt.game.GameManager;
 import de.jawollo07.manhunt.modes.GameModeRegistry;
 import de.jawollo07.manhunt.player.PlayerManager;
+import de.jawollo07.manhunt.player.PlayerSnapshotService;
 import de.jawollo07.manhunt.storage.ConfigManager;
 import de.jawollo07.manhunt.storage.StorageManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -14,6 +15,7 @@ public final class ManHuntPlugin extends JavaPlugin {
     private GameLifecycleService gameLifecycleService;
     private GameModeRegistry gameModeRegistry;
     private PlayerManager playerManager;
+    private PlayerSnapshotService playerSnapshotService;
     private StorageManager storageManager;
 
     @Override
@@ -25,6 +27,7 @@ public final class ManHuntPlugin extends JavaPlugin {
         gameLifecycleService = new GameLifecycleService(gameManager);
         gameModeRegistry = new GameModeRegistry();
         playerManager = new PlayerManager();
+        playerSnapshotService = new PlayerSnapshotService();
         storageManager = new StorageManager(this, configManager);
 
         try {
@@ -40,6 +43,9 @@ public final class ManHuntPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (playerSnapshotService != null) {
+            playerSnapshotService.clear();
+        }
         if (storageManager != null) {
             storageManager.close();
         }
@@ -51,5 +57,6 @@ public final class ManHuntPlugin extends JavaPlugin {
     public GameLifecycleService getGameLifecycleService() { return gameLifecycleService; }
     public GameModeRegistry getGameModeRegistry() { return gameModeRegistry; }
     public PlayerManager getPlayerManager() { return playerManager; }
+    public PlayerSnapshotService getPlayerSnapshotService() { return playerSnapshotService; }
     public StorageManager getStorageManager() { return storageManager; }
 }
