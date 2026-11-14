@@ -45,7 +45,9 @@ public final class ManHuntPlugin extends JavaPlugin {
             return;
         }
 
-        gameLifecycleService = new GameLifecycleService(gameManager, playerSnapshotService, playerManager);
+        gameLifecycleService = new GameLifecycleService(
+                gameManager, playerSnapshotService, playerManager, mapManager
+        );
         getServer().getPluginManager().registerEvents(
                 new PlayerSessionListener(gameManager, gameLifecycleService, playerSnapshotService),
                 this
@@ -64,6 +66,13 @@ public final class ManHuntPlugin extends JavaPlugin {
                     getLogger().severe("Could not restore player " + player.getUniqueId()
                             + " during shutdown: " + exception.getMessage());
                 }
+            }
+        }
+        if (mapManager != null) {
+            try {
+                mapManager.deleteAllWorkingCopies();
+            } catch (Exception exception) {
+                getLogger().severe("Could not clean up temporary arena worlds: " + exception.getMessage());
             }
         }
         if (storageManager != null) storageManager.close();
