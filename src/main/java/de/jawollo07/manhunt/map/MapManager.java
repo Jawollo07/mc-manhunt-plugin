@@ -71,9 +71,9 @@ public final class MapManager {
             throw new IOException("Temporary world destination already exists or is invalid: " + worldName);
         }
 
-        copyWorldFolder(template, destination);
         boolean loaded = false;
         try {
+            copyWorldFolder(template, destination);
             World world = Bukkit.createWorld(new WorldCreator(worldName));
             if (world == null) {
                 throw new IOException("Paper could not load temporary world: " + worldName);
