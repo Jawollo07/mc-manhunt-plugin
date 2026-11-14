@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Objects;
 
 public final class StorageManager implements AutoCloseable {
@@ -22,16 +23,12 @@ public final class StorageManager implements AutoCloseable {
     }
 
     public void connect() throws IOException {
-        if (dataSource != null && !dataSource.isClosed()) {
-            return;
-        }
+        if (dataSource != null && !dataSource.isClosed()) return;
 
         String relativePath = configManager.getString("database.file", "data/manhunt.db");
         Path databasePath = plugin.getDataFolder().toPath().resolve(relativePath).normalize();
         Path parent = databasePath.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
+        if (parent != null) Files.createDirectories(parent);
 
         HikariConfig hikari = new HikariConfig();
         hikari.setPoolName("ManHunt-SQLite");
@@ -43,11 +40,34 @@ public final class StorageManager implements AutoCloseable {
         hikari.setConnectionInitSql("PRAGMA foreign_keys = ON");
 
         dataSource = new HikariDataSource(hikari);
-        try (Connection ignored = dataSource.getConnection()) {
+        try (Connection connection = dataSource.getConnection()) {
+            initializeSchema(connection);
             plugin.getLogger().info("SQLite database connected: " + databasePath);
         } catch (SQLException exception) {
             close();
-            throw new IllegalStateException("Could not connect to SQLite database", exception);
+            throw new IllegalStateException("Could not initialize SQLite database", exception);
+        }
+    }
+
+    private void initializeSchema(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS player_snapshots (
+                        player_uuid TEXT PRIMARY KEY NOT NULL,
+                        payload BLOB NOT NULL,
+                        created_at INTEGER NOT NULL
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS schema_migrations (
+                        version INTEGER PRIMARY KEY NOT NULL,
+                        applied_at INTEGER NOT NULL
+                    )
+                    """);
+            statement.execute("""
+                    INSERT OR IGNORE INTO schema_migrations (version, applied_at)
+                    VALUES (1, strftime('%s', 'now') * 1000)
+                    """);
         }
     }
 
@@ -60,8 +80,6 @@ public final class StorageManager implements AutoCloseable {
 
     @Override
     public void close() {
-        if (dataSource != null && !dataSource.isClosed()) {
-            dataSource.close();
-        }
+        if (dataSource != null && !dataSource.isClosed()) dataSource.close();
     }
 }
