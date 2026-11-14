@@ -77,6 +77,19 @@ class GameManagerTest {
     }
 
     @Test
+    void allowsMapAssignmentWhileCountdownIsActive() {
+        GameManager manager = new GameManager();
+        manager.createGame(mode, arena, settings);
+        manager.transition(GameState.LOBBY);
+        manager.transition(GameState.COUNTDOWN);
+
+        de.jawollo07.manhunt.map.MapInstance instance =
+                de.jawollo07.manhunt.map.MapInstance.create("forest", "manhunt_forest_test");
+        assertDoesNotThrow(() -> manager.assignMapInstance(instance));
+        assertEquals(instance, manager.getActiveGame().orElseThrow().getMapInstance().orElseThrow());
+    }
+
+    @Test
     void rejectsResultForAnotherGame() {
         GameManager manager = new GameManager();
         manager.createGame(mode, arena, settings);
