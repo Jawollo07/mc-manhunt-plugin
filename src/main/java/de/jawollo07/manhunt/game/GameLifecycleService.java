@@ -1,6 +1,10 @@
 package de.jawollo07.manhunt.game;
 
+import de.jawollo07.manhunt.player.PlayerManager;
+import de.jawollo07.manhunt.player.PlayerSnapshotService;
+
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Coordinates mode callbacks with the shared game state machine.
@@ -8,9 +12,27 @@ import java.util.Objects;
  */
 public final class GameLifecycleService {
     private final GameManager gameManager;
+    private final PlayerSnapshotService snapshotService;
+    private final PlayerManager playerManager;
 
+    /**
+     * Constructor for core-only use and tests that do not interact with Bukkit players.
+     */
     public GameLifecycleService(GameManager gameManager) {
+        this(gameManager, null, null);
+    }
+
+    public GameLifecycleService(
+            GameManager gameManager,
+            PlayerSnapshotService snapshotService,
+            PlayerManager playerManager
+    ) {
         this.gameManager = Objects.requireNonNull(gameManager, "gameManager");
+        if ((snapshotService == null) != (playerManager == null)) {
+            throw new IllegalArgumentException("Snapshot and player services must be provided together");
+        }
+        this.snapshotService = snapshotService;
+        this.playerManager = playerManager;
     }
 
     public void prepare() {
@@ -23,8 +45,15 @@ public final class GameLifecycleService {
         if (game.getPlayerCount() < game.getSettings().minPlayers()) {
             throw new IllegalStateException("Not enough players to prepare this game");
         }
-        game.getMode().onPrepare(game);
-        gameManager.transition(GameState.STARTING);
+
+        captureParticipants(game);
+        try {
+            game.getMode().onPrepare(game);
+            gameManager.transition(GameState.STARTING);
+        } catch (RuntimeException exception) {
+            restoreOnlineParticipants(game);
+            throw exception;
+        }
     }
 
     public void start() {
@@ -39,10 +68,16 @@ public final class GameLifecycleService {
     public void finish(GameResult result) {
         Game game = requireGame();
         gameManager.finish(result);
-        game.getMode().onEnd(game);
+        try {
+            game.getMode().onEnd(game);
+        } finally {
+            // Online players are restored immediately. Offline players keep their
+            // snapshots until the join listener can restore them on reconnect.
+            restoreOnlineParticipants(game);
+        }
     }
 
-    public void playerJoined(java.util.UUID playerId) {
+    public void playerJoined(UUID playerId) {
         Game game = requireGame();
         GamePlayer player = game.getPlayer(playerId).orElseThrow(
                 () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
@@ -51,7 +86,7 @@ public final class GameLifecycleService {
         game.getMode().onPlayerJoin(game, player);
     }
 
-    public void playerQuit(java.util.UUID playerId) {
+    public void playerQuit(UUID playerId) {
         Game game = requireGame();
         GamePlayer player = game.getPlayer(playerId).orElseThrow(
                 () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
@@ -60,7 +95,7 @@ public final class GameLifecycleService {
         game.getMode().onPlayerQuit(game, player);
     }
 
-    public void playerDied(java.util.UUID playerId, java.util.UUID killerId) {
+    public void playerDied(UUID playerId, UUID killerId) {
         Game game = requireGame();
         if (game.getState() != GameState.RUNNING) {
             throw new IllegalStateException("Deaths can only be processed while the game is running");
@@ -82,6 +117,8 @@ public final class GameLifecycleService {
     }
 
     public void beginReset() {
+        Game game = requireGame();
+        restoreOnlineParticipants(game);
         gameManager.beginReset();
     }
 
@@ -90,7 +127,34 @@ public final class GameLifecycleService {
      * been unloaded and cleaned up.
      */
     public void completeReset() {
+        Game game = requireGame();
+        restoreOnlineParticipants(game);
         gameManager.clearFinishedGame();
+    }
+
+    private void captureParticipants(Game game) {
+        if (snapshotService == null) return;
+        for (GamePlayer participant : game.getPlayers()) {
+            playerManager.findOnlinePlayer(participant.getUniqueId())
+                    .ifPresent(snapshotService::captureIfAbsent);
+        }
+    }
+
+    private void restoreOnlineParticipants(Game game) {
+        if (snapshotService == null) return;
+        RuntimeException failure = null;
+        for (GamePlayer participant : game.getPlayers()) {
+            try {
+                playerManager.findOnlinePlayer(participant.getUniqueId())
+                        .ifPresent(snapshotService::restore);
+            } catch (RuntimeException exception) {
+                if (failure == null) {
+                    failure = new IllegalStateException("One or more player snapshots could not be restored");
+                }
+                failure.addSuppressed(exception);
+            }
+        }
+        if (failure != null) throw failure;
     }
 
     private Game requireGame() {
