@@ -124,6 +124,24 @@ public final class MapManager {
         plugin.getLogger().info("Deleted temporary map " + instance.worldName());
     }
 
+    /**
+     * Best-effort shutdown cleanup. Players must have been restored/teleported
+     * out before this method is called.
+     */
+    public void deleteAllWorkingCopies() throws IOException {
+        requireServerThread();
+        IOException failure = null;
+        for (LoadedMap loaded : java.util.List.copyOf(instances.values())) {
+            try {
+                deleteWorkingCopy(loaded.instance());
+            } catch (IOException exception) {
+                if (failure == null) failure = new IOException("One or more temporary maps could not be deleted");
+                failure.addSuppressed(exception);
+            }
+        }
+        if (failure != null) throw failure;
+    }
+
     public int getActiveInstanceCount() {
         return instances.size();
     }
