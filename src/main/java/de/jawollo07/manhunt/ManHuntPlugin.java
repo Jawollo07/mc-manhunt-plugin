@@ -4,9 +4,11 @@ import de.jawollo07.manhunt.game.GameLifecycleService;
 import de.jawollo07.manhunt.game.GameManager;
 import de.jawollo07.manhunt.modes.GameModeRegistry;
 import de.jawollo07.manhunt.player.PlayerManager;
+import de.jawollo07.manhunt.player.PlayerSessionListener;
 import de.jawollo07.manhunt.player.PlayerSnapshotService;
 import de.jawollo07.manhunt.storage.ConfigManager;
 import de.jawollo07.manhunt.storage.StorageManager;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ManHuntPlugin extends JavaPlugin {
@@ -24,10 +26,10 @@ public final class ManHuntPlugin extends JavaPlugin {
 
         configManager = new ConfigManager(this);
         gameManager = new GameManager();
-        gameLifecycleService = new GameLifecycleService(gameManager);
         gameModeRegistry = new GameModeRegistry();
         playerManager = new PlayerManager();
         playerSnapshotService = new PlayerSnapshotService();
+        gameLifecycleService = new GameLifecycleService(gameManager, playerSnapshotService, playerManager);
         storageManager = new StorageManager(this, configManager);
 
         try {
@@ -38,13 +40,18 @@ public final class ManHuntPlugin extends JavaPlugin {
             return;
         }
 
+        getServer().getPluginManager().registerEvents(
+                new PlayerSessionListener(gameManager, gameLifecycleService, playerSnapshotService),
+                this
+        );
+
         getLogger().info("ManHuntPlugin enabled. Core services initialized.");
     }
 
     @Override
     public void onDisable() {
         if (playerSnapshotService != null) {
-            for (org.bukkit.entity.Player player : getServer().getOnlinePlayers()) {
+            for (Player player : getServer().getOnlinePlayers()) {
                 try {
                     playerSnapshotService.restore(player);
                 } catch (RuntimeException exception) {
@@ -52,7 +59,6 @@ public final class ManHuntPlugin extends JavaPlugin {
                             + " during shutdown: " + exception.getMessage());
                 }
             }
-            playerSnapshotService.clear();
         }
         if (storageManager != null) {
             storageManager.close();
