@@ -14,6 +14,24 @@ import java.util.UUID;
 public final class PlayerSnapshotService {
     private final Map<UUID, PlayerSnapshot> snapshots = new HashMap<>();
 
+    /**
+     * Captures a player only once. Rejoining or a repeated lifecycle callback
+     * must never replace the original pre-game state with an in-game state.
+     *
+     * @return true when a new snapshot was captured
+     */
+    public boolean captureIfAbsent(Player player) {
+        Objects.requireNonNull(player, "player");
+        if (snapshots.containsKey(player.getUniqueId())) {
+            return false;
+        }
+        snapshots.put(player.getUniqueId(), PlayerSnapshot.capture(player));
+        return true;
+    }
+
+    /**
+     * Explicit capture for callers that intentionally want to replace a snapshot.
+     */
     public void capture(Player player) {
         Objects.requireNonNull(player, "player");
         snapshots.put(player.getUniqueId(), PlayerSnapshot.capture(player));
@@ -38,10 +56,6 @@ public final class PlayerSnapshotService {
 
     public boolean discard(UUID playerId) {
         return snapshots.remove(Objects.requireNonNull(playerId, "playerId")) != null;
-    }
-
-    public void clear() {
-        snapshots.clear();
     }
 
     public int size() {
