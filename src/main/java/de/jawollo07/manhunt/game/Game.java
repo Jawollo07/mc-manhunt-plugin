@@ -116,7 +116,7 @@ public final class Game {
     }
 
     void setMapInstance(MapInstance mapInstance) {
-        if (state != GameState.WAITING && state != GameState.LOBBY) {
+        if (state != GameState.WAITING && state != GameState.LOBBY && state != GameState.COUNTDOWN) {
             throw new IllegalStateException("Map can only be assigned before the game starts");
         }
         this.mapInstance = Objects.requireNonNull(mapInstance, "mapInstance");
