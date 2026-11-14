@@ -5,6 +5,7 @@ import de.jawollo07.manhunt.game.GameManager;
 import de.jawollo07.manhunt.modes.GameModeRegistry;
 import de.jawollo07.manhunt.player.PlayerManager;
 import de.jawollo07.manhunt.player.PlayerSessionListener;
+import de.jawollo07.manhunt.player.PlayerSnapshotRepository;
 import de.jawollo07.manhunt.player.PlayerSnapshotService;
 import de.jawollo07.manhunt.storage.ConfigManager;
 import de.jawollo07.manhunt.storage.StorageManager;
@@ -18,6 +19,7 @@ public final class ManHuntPlugin extends JavaPlugin {
     private GameModeRegistry gameModeRegistry;
     private PlayerManager playerManager;
     private PlayerSnapshotService playerSnapshotService;
+    private PlayerSnapshotRepository playerSnapshotRepository;
     private StorageManager storageManager;
 
     @Override
@@ -28,18 +30,19 @@ public final class ManHuntPlugin extends JavaPlugin {
         gameManager = new GameManager();
         gameModeRegistry = new GameModeRegistry();
         playerManager = new PlayerManager();
-        playerSnapshotService = new PlayerSnapshotService();
-        gameLifecycleService = new GameLifecycleService(gameManager, playerSnapshotService, playerManager);
         storageManager = new StorageManager(this, configManager);
 
         try {
             storageManager.connect();
+            playerSnapshotRepository = new PlayerSnapshotRepository(storageManager);
+            playerSnapshotService = new PlayerSnapshotService(playerSnapshotRepository);
         } catch (Exception exception) {
             getLogger().severe("Could not initialize the plugin database: " + exception.getMessage());
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
 
+        gameLifecycleService = new GameLifecycleService(gameManager, playerSnapshotService, playerManager);
         getServer().getPluginManager().registerEvents(
                 new PlayerSessionListener(gameManager, gameLifecycleService, playerSnapshotService),
                 this
@@ -60,9 +63,7 @@ public final class ManHuntPlugin extends JavaPlugin {
                 }
             }
         }
-        if (storageManager != null) {
-            storageManager.close();
-        }
+        if (storageManager != null) storageManager.close();
         getLogger().info("ManHuntPlugin disabled.");
     }
 
@@ -72,5 +73,6 @@ public final class ManHuntPlugin extends JavaPlugin {
     public GameModeRegistry getGameModeRegistry() { return gameModeRegistry; }
     public PlayerManager getPlayerManager() { return playerManager; }
     public PlayerSnapshotService getPlayerSnapshotService() { return playerSnapshotService; }
+    public PlayerSnapshotRepository getPlayerSnapshotRepository() { return playerSnapshotRepository; }
     public StorageManager getStorageManager() { return storageManager; }
 }
