@@ -1,0 +1,5 @@
+name: ManHunt
+version: 0.1.0
+main: de.jawollo07.manhunt.ManHuntPlugin
+description: Modular Manhunt minigame with multiple game modes
+author: Jawollo07
