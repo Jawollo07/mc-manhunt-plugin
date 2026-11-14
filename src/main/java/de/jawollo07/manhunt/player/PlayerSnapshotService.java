@@ -13,28 +13,29 @@ import java.util.UUID;
  */
 public final class PlayerSnapshotService {
     private final Map<UUID, PlayerSnapshot> snapshots = new HashMap<>();
+    private final PlayerSnapshotRepository repository;
 
-    /**
-     * Captures a player only once. Rejoining or a repeated lifecycle callback
-     * must never replace the original pre-game state with an in-game state.
-     *
-     * @return true when a new snapshot was captured
-     */
+    public PlayerSnapshotService(PlayerSnapshotRepository repository) {
+        this.repository = Objects.requireNonNull(repository, "repository");
+        snapshots.putAll(repository.loadAll());
+    }
+
     public boolean captureIfAbsent(Player player) {
         Objects.requireNonNull(player, "player");
-        if (snapshots.containsKey(player.getUniqueId())) {
-            return false;
-        }
-        snapshots.put(player.getUniqueId(), PlayerSnapshot.capture(player));
+        UUID playerId = player.getUniqueId();
+        if (snapshots.containsKey(playerId)) return false;
+        PlayerSnapshot snapshot = PlayerSnapshot.capture(player);
+        repository.save(playerId, snapshot);
+        snapshots.put(playerId, snapshot);
         return true;
     }
 
-    /**
-     * Explicit capture for callers that intentionally want to replace a snapshot.
-     */
     public void capture(Player player) {
         Objects.requireNonNull(player, "player");
-        snapshots.put(player.getUniqueId(), PlayerSnapshot.capture(player));
+        UUID playerId = player.getUniqueId();
+        PlayerSnapshot snapshot = PlayerSnapshot.capture(player);
+        repository.save(playerId, snapshot);
+        snapshots.put(playerId, snapshot);
     }
 
     public boolean hasSnapshot(UUID playerId) {
@@ -42,20 +43,25 @@ public final class PlayerSnapshotService {
     }
 
     /**
-     * Restores the snapshot and removes it only after restoration returns.
-     * Returns false when no snapshot exists for this player.
+     * Removes the durable record only after the in-game state was restored.
      */
     public boolean restore(Player player) {
         Objects.requireNonNull(player, "player");
-        PlayerSnapshot snapshot = snapshots.get(player.getUniqueId());
+        UUID playerId = player.getUniqueId();
+        PlayerSnapshot snapshot = snapshots.get(playerId);
         if (snapshot == null) return false;
         snapshot.restore(player);
-        snapshots.remove(player.getUniqueId());
+        repository.delete(playerId);
+        snapshots.remove(playerId);
         return true;
     }
 
     public boolean discard(UUID playerId) {
-        return snapshots.remove(Objects.requireNonNull(playerId, "playerId")) != null;
+        Objects.requireNonNull(playerId, "playerId");
+        if (!snapshots.containsKey(playerId)) return false;
+        repository.delete(playerId);
+        snapshots.remove(playerId);
+        return true;
     }
 
     public int size() {
