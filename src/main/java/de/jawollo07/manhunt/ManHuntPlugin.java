@@ -3,6 +3,7 @@ package de.jawollo07.manhunt;
 import de.jawollo07.manhunt.game.GameLifecycleService;
 import de.jawollo07.manhunt.game.GameManager;
 import de.jawollo07.manhunt.modes.GameModeRegistry;
+import de.jawollo07.manhunt.map.MapManager;
 import de.jawollo07.manhunt.player.PlayerManager;
 import de.jawollo07.manhunt.player.PlayerSessionListener;
 import de.jawollo07.manhunt.player.PlayerSnapshotRepository;
@@ -17,6 +18,7 @@ public final class ManHuntPlugin extends JavaPlugin {
     private GameManager gameManager;
     private GameLifecycleService gameLifecycleService;
     private GameModeRegistry gameModeRegistry;
+    private MapManager mapManager;
     private PlayerManager playerManager;
     private PlayerSnapshotService playerSnapshotService;
     private PlayerSnapshotRepository playerSnapshotRepository;
@@ -30,6 +32,7 @@ public final class ManHuntPlugin extends JavaPlugin {
         gameManager = new GameManager();
         gameModeRegistry = new GameModeRegistry();
         playerManager = new PlayerManager();
+        mapManager = new MapManager(this);
         storageManager = new StorageManager(this, configManager);
 
         try {
@@ -71,6 +74,7 @@ public final class ManHuntPlugin extends JavaPlugin {
     public GameManager getGameManager() { return gameManager; }
     public GameLifecycleService getGameLifecycleService() { return gameLifecycleService; }
     public GameModeRegistry getGameModeRegistry() { return gameModeRegistry; }
+    public MapManager getMapManager() { return mapManager; }
     public PlayerManager getPlayerManager() { return playerManager; }
     public PlayerSnapshotService getPlayerSnapshotService() { return playerSnapshotService; }
     public PlayerSnapshotRepository getPlayerSnapshotRepository() { return playerSnapshotRepository; }
