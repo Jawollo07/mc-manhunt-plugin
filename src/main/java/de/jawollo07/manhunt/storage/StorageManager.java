@@ -68,6 +68,32 @@ public final class StorageManager implements AutoCloseable {
                     INSERT OR IGNORE INTO schema_migrations (version, applied_at)
                     VALUES (1, strftime('%s', 'now') * 1000)
                     """);
+
+            // Migration 2: persistent arena definitions and named spawn points.
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS arenas (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        display_name TEXT NOT NULL,
+                        world_name TEXT NOT NULL
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS arena_spawn_points (
+                        arena_id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        x REAL NOT NULL,
+                        y REAL NOT NULL,
+                        z REAL NOT NULL,
+                        yaw REAL NOT NULL,
+                        pitch REAL NOT NULL,
+                        PRIMARY KEY (arena_id, name),
+                        FOREIGN KEY (arena_id) REFERENCES arenas(id) ON DELETE CASCADE
+                    )
+                    """);
+            statement.execute("""
+                    INSERT OR IGNORE INTO schema_migrations (version, applied_at)
+                    VALUES (2, strftime('%s', 'now') * 1000)
+                    """);
         }
     }
 
