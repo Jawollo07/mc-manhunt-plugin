@@ -3,3 +3,12 @@ version: 0.1.0
 main: de.jawollo07.manhunt.ManHuntPlugin
 description: Modular Manhunt minigame with multiple game modes
 author: Jawollo07
+commands:
+  manhunt:
+    description: ManHunt administration and game management
+    usage: /manhunt arena
+    aliases: [mh]
+permissions:
+  manhunt.admin:
+    description: Allows administration of ManHunt arenas and settings
+    default: op
