@@ -1,5 +1,7 @@
 package de.jawollo07.manhunt;
 
+import de.jawollo07.manhunt.arena.ArenaRepository;
+import de.jawollo07.manhunt.arena.ArenaService;
 import de.jawollo07.manhunt.game.GameLifecycleService;
 import de.jawollo07.manhunt.game.GameManager;
 import de.jawollo07.manhunt.modes.GameModeRegistry;
@@ -22,6 +24,8 @@ public final class ManHuntPlugin extends JavaPlugin {
     private PlayerManager playerManager;
     private PlayerSnapshotService playerSnapshotService;
     private PlayerSnapshotRepository playerSnapshotRepository;
+    private ArenaRepository arenaRepository;
+    private ArenaService arenaService;
     private StorageManager storageManager;
 
     @Override
@@ -39,6 +43,8 @@ public final class ManHuntPlugin extends JavaPlugin {
             storageManager.connect();
             playerSnapshotRepository = new PlayerSnapshotRepository(storageManager);
             playerSnapshotService = new PlayerSnapshotService(playerSnapshotRepository);
+            arenaRepository = new ArenaRepository(storageManager);
+            arenaService = new ArenaService(arenaRepository);
         } catch (Exception exception) {
             getLogger().severe("Could not initialize the plugin database: " + exception.getMessage());
             getServer().getPluginManager().disablePlugin(this);
@@ -87,5 +93,7 @@ public final class ManHuntPlugin extends JavaPlugin {
     public PlayerManager getPlayerManager() { return playerManager; }
     public PlayerSnapshotService getPlayerSnapshotService() { return playerSnapshotService; }
     public PlayerSnapshotRepository getPlayerSnapshotRepository() { return playerSnapshotRepository; }
+    public ArenaRepository getArenaRepository() { return arenaRepository; }
+    public ArenaService getArenaService() { return arenaService; }
     public StorageManager getStorageManager() { return storageManager; }
 }
