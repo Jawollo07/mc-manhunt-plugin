@@ -1,5 +1,6 @@
 package de.jawollo07.manhunt;
 
+import de.jawollo07.manhunt.arena.ArenaCommand;
 import de.jawollo07.manhunt.arena.ArenaRepository;
 import de.jawollo07.manhunt.arena.ArenaService;
 import de.jawollo07.manhunt.game.GameLifecycleService;
@@ -12,6 +13,7 @@ import de.jawollo07.manhunt.player.PlayerSnapshotRepository;
 import de.jawollo07.manhunt.player.PlayerSnapshotService;
 import de.jawollo07.manhunt.storage.ConfigManager;
 import de.jawollo07.manhunt.storage.StorageManager;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -58,6 +60,16 @@ public final class ManHuntPlugin extends JavaPlugin {
                 new PlayerSessionListener(gameManager, gameLifecycleService, playerSnapshotService),
                 this
         );
+
+        PluginCommand command = getCommand("manhunt");
+        if (command == null) {
+            getLogger().severe("The /manhunt command is missing from plugin.yml");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        ArenaCommand arenaCommand = new ArenaCommand(this);
+        command.setExecutor(arenaCommand);
+        command.setTabCompleter(arenaCommand);
 
         getLogger().info("ManHuntPlugin enabled. Core services initialized.");
     }
