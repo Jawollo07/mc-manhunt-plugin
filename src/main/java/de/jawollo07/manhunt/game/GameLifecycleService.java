@@ -1,9 +1,12 @@
 package de.jawollo07.manhunt.game;
 
+import de.jawollo07.manhunt.arena.Arena;
+import de.jawollo07.manhunt.arena.ArenaSpawnPoint;
 import de.jawollo07.manhunt.map.MapInstance;
 import de.jawollo07.manhunt.map.MapManager;
 import de.jawollo07.manhunt.player.PlayerManager;
 import de.jawollo07.manhunt.player.PlayerSnapshotService;
+import de.jawollo07.manhunt.teams.Team;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -90,8 +93,8 @@ public final class GameLifecycleService {
     }
 
     /**
-     * Moves online participants into the temporary world before invoking mode setup.
-     * The saved snapshots retain their original locations for later restoration.
+     * Sends each participant to their configured team spawn, falling back to the
+     * arena's default spawn and finally the temporary world's natural spawn.
      */
     public void start() {
         Game game = requireGame();
@@ -102,9 +105,9 @@ public final class GameLifecycleService {
         try {
             if (mapManager != null && game.getMapInstance().isPresent()) {
                 World world = mapManager.getWorld(game.getMapInstance().orElseThrow());
-                Location spawn = world.getSpawnLocation();
                 for (GamePlayer participant : game.getPlayers()) {
                     playerManager.findOnlinePlayer(participant.getUniqueId()).ifPresent(player -> {
+                        Location spawn = resolveSpawn(game, participant, world);
                         if (!player.teleport(spawn)) {
                             throw new IllegalStateException("Could not teleport player " + player.getUniqueId()
                                     + " into the arena");
@@ -122,6 +125,25 @@ public final class GameLifecycleService {
             }
             throw exception;
         }
+    }
+
+    private Location resolveSpawn(Game game, GamePlayer participant, World world) {
+        Arena arena = game.getArena();
+        Team team = game.getTeamManager().getTeamOf(participant.getUniqueId()).orElse(null);
+        if (team != null) {
+            String teamKey = "team:" + slug(team.getName());
+            ArenaSpawnPoint teamSpawn = arena.spawnPoint(teamKey).orElse(null);
+            if (teamSpawn != null) return teamSpawn.toLocation(world);
+        }
+        return arena.spawnPoint("default")
+                .map(point -> point.toLocation(world))
+                .orElseGet(world::getSpawnLocation);
+    }
+
+    private String slug(String value) {
+        return value.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9_-]+", "-")
+                .replaceAll("^-+|-+$", "");
     }
 
     public void finish(GameResult result) {
