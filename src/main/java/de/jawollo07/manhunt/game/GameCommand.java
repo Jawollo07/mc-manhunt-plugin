@@ -174,6 +174,9 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     private void stop(CommandSender sender, String[] args) {
         requireAdmin(sender);
         Game game = requireGame();
+        if (game.getState() == GameState.ENDING || game.getState() == GameState.RESETTING) {
+            throw new IllegalStateException("Die Runde wird bereits beendet oder zurückgesetzt. Nutze /manhunt game reset.");
+        }
         cancelCountdown();
         cancelGameTicker();
         String reason = args.length > 2 ? String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length))
