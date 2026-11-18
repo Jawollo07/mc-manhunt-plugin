@@ -79,18 +79,24 @@ public final class BuiltinGameModes {
         protected void finish(Game game, GameOutcome outcome, List<UUID> winners, String reason) {
             if (ended || game.getState() != GameState.RUNNING) return;
             ended = true;
-            Instant now = Instant.now();
-            Instant start = game.getStartedAt().orElse(startedAt == null ? now : startedAt);
-            GameResult result = new GameResult(game.getId(), outcome, winners,
-                    game.getPlayers().stream().map(GamePlayer::getUniqueId).toList(),
-                    start, now, Duration.between(start, now), reason);
-            try {
-                plugin.getGameLifecycleService().finish(result);
-                plugin.getGameLifecycleService().beginReset();
-                plugin.getGameLifecycleService().completeReset();
-            } catch (RuntimeException exception) {
-                plugin.getLogger().severe("Could not finish " + getId() + " game: " + exception.getMessage());
-            }
+            // Death-triggered victories must be finalized after Bukkit has completed
+            // the death/respawn sequence; restoring a snapshot inside PlayerDeathEvent
+            // can otherwise attempt to heal a player before respawn.
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                if (game.getState() != GameState.RUNNING) return;
+                Instant now = Instant.now();
+                Instant start = game.getStartedAt().orElse(startedAt == null ? now : startedAt);
+                GameResult result = new GameResult(game.getId(), outcome, winners,
+                        game.getPlayers().stream().map(GamePlayer::getUniqueId).toList(),
+                        start, now, Duration.between(start, now), reason);
+                try {
+                    plugin.getGameLifecycleService().finish(result);
+                    plugin.getGameLifecycleService().beginReset();
+                    plugin.getGameLifecycleService().completeReset();
+                } catch (RuntimeException exception) {
+                    plugin.getLogger().severe("Could not finish " + getId() + " game: " + exception.getMessage());
+                }
+            });
         }
 
         protected boolean timedOut(Game game, long elapsedSeconds) {
