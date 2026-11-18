@@ -98,7 +98,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
     }
 
     private void setSpawn(CommandSender sender, String[] args) throws SQLException {
-        requireArgs(args, 4, "Verwendung: /manhunt arena setspawn <id> <default|team:name>");
+        requireArgs(args, 4, "Verwendung: /manhunt arena setspawn <id> <default|team:name|extraction>");
         if (!(sender instanceof Player player)) {
             sender.sendMessage("§cDieser Befehl kann nur von einem Spieler ausgeführt werden.");
             return;
@@ -157,7 +157,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
             }
         }
         if (args.length == 4 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("setspawn")) {
-            return filter(List.of("default", "team:hunter", "team:survivor", "team:juggernaut"), args[3]);
+            return filter(List.of("default", "team:hitmen", "team:survivors", "team:juggernaut", "team:hunters", "team:assassins", "team:infected", "extraction"), args[3]);
         }
         return new ArrayList<>();
     }
