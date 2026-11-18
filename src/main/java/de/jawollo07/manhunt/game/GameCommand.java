@@ -21,6 +21,7 @@ import java.util.UUID;
 public final class GameCommand implements CommandExecutor, TabCompleter {
     private final ManHuntPlugin plugin;
     private BukkitTask countdownTask;
+    private BukkitTask gameTickTask;
 
     public GameCommand(ManHuntPlugin plugin) {
         this.plugin = plugin;
@@ -158,6 +159,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
             plugin.getGameLifecycleService().prepare();
             plugin.getGameLifecycleService().start();
             Bukkit.broadcastMessage("§a[ManHunt] Die Runde hat begonnen!");
+            startGameTicker(game);
         } catch (RuntimeException exception) {
             plugin.getLogger().severe("Could not start game " + game.getId() + ": " + exception.getMessage());
             Bukkit.broadcastMessage("§c[ManHunt] Start fehlgeschlagen: " + exception.getMessage());
@@ -173,6 +175,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         requireAdmin(sender);
         Game game = requireGame();
         cancelCountdown();
+        cancelGameTicker();
         String reason = args.length > 2 ? String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length))
                 : "Von einem Administrator beendet";
         finishAndReset(game, GameOutcome.CANCELLED, reason);
@@ -197,6 +200,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         requireAdmin(sender);
         Game game = requireGame();
         cancelCountdown();
+        cancelGameTicker();
         if (game.getState() == GameState.ENDING) {
             plugin.getGameLifecycleService().beginReset();
         }
@@ -260,11 +264,38 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/" + label + " modes");
     }
 
+    private void startGameTicker(Game game) {
+        cancelGameTicker();
+        final long[] elapsed = {0L};
+        gameTickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (plugin.getGameManager().getActiveGame().orElse(null) != game
+                    || game.getState() != GameState.RUNNING) {
+                cancelGameTicker();
+                return;
+            }
+            try {
+                elapsed[0]++;
+                plugin.getGameLifecycleService().tick(elapsed[0]);
+            } catch (RuntimeException exception) {
+                plugin.getLogger().severe("Game tick failed for " + game.getId() + ": " + exception.getMessage());
+                cancelGameTicker();
+            }
+        }, 20L, 20L);
+    }
+
+    private void cancelGameTicker() {
+        if (gameTickTask != null) {
+            gameTickTask.cancel();
+            gameTickTask = null;
+        }
+    }
+
     public void cancelCountdown() {
         if (countdownTask != null) {
             countdownTask.cancel();
             countdownTask = null;
         }
+        cancelGameTicker();
     }
 
     @Override
