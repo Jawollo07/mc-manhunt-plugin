@@ -87,6 +87,11 @@ public final class GameLifecycleService {
             } catch (RuntimeException | IOException cleanupFailure) {
                 exception.addSuppressed(cleanupFailure);
             }
+            // A failed mode preparation may already have assigned partial teams
+            // and roles. The same lobby session can be retried, so clear those
+            // generic per-round assignments before returning control to it.
+            game.getTeamManager().clear();
+            game.getRoleManager().clear();
             throw exception instanceof RuntimeException runtime
                     ? runtime : new IllegalStateException("Could not prepare the game map", exception);
         }
