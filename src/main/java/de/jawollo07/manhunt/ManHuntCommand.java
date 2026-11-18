@@ -29,7 +29,7 @@ public final class ManHuntCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         switch (args[0].toLowerCase(Locale.ROOT)) {
-            case "arena" -> arenaCommand.onCommand(sender, command, label, tail(args));
+            case "arena" -> arenaCommand.onCommand(sender, command, label, args);
             case "game" -> gameCommand.onCommand(sender, command, label, args);
             case "modes" -> listModes(sender);
             default -> help(sender, label);
@@ -57,10 +57,6 @@ public final class ManHuntCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/" + label + " game");
     }
 
-    private String[] tail(String[] args) {
-        return java.util.Arrays.copyOfRange(args, 1, args.length);
-    }
-
     public void shutdown() {
         gameCommand.cancelCountdown();
     }
@@ -71,7 +67,7 @@ public final class ManHuntCommand implements CommandExecutor, TabCompleter {
             return filter(List.of("arena", "game", "modes"), args[0]);
         }
         return switch (args[0].toLowerCase(Locale.ROOT)) {
-            case "arena" -> arenaCommand.onTabComplete(sender, command, alias, tail(args));
+            case "arena" -> arenaCommand.onTabComplete(sender, command, alias, args);
             case "game" -> gameCommand.onTabComplete(sender, command, alias, args);
             default -> List.of();
         };
