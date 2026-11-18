@@ -243,6 +243,13 @@ public final class BuiltinGameModes {
                 boss.setHealth(40.0);
                 apply(boss, PotionEffectType.RESISTANCE, Integer.MAX_VALUE, 1);
                 apply(boss, PotionEffectType.STRENGTH, Integer.MAX_VALUE, 1);
+                boss.getInventory().addItem(
+                        JuggernautAbilityListener.abilityItem(org.bukkit.Material.BLAZE_ROD, "Ground Slam"),
+                        JuggernautAbilityListener.abilityItem(org.bukkit.Material.IRON_INGOT, "Charge"),
+                        JuggernautAbilityListener.abilityItem(org.bukkit.Material.GOAT_HORN, "Roar"),
+                        JuggernautAbilityListener.abilityItem(org.bukkit.Material.GOLDEN_APPLE, "Regeneration")
+                );
+                boss.sendMessage("§eFähigkeiten: §cBlaze Rod §7= Slam, §cIron Ingot §7= Charge, §cGoat Horn §7= Roar, §cGolden Apple §7= Regeneration");
             }
         }
 
