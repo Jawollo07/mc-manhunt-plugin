@@ -11,7 +11,6 @@ import de.jawollo07.manhunt.modes.GameModeFactory;
 import de.jawollo07.manhunt.player.PlayerStatus;
 import de.jawollo07.manhunt.teams.Team;
 import org.bukkit.Bukkit;
-import org.bukkit.GameMode as BukkitGameMode;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -70,7 +69,7 @@ public final class BuiltinGameModes {
         protected void eliminate(Game game, GamePlayer participant) {
             participant.setStatus(PlayerStatus.ELIMINATED);
             Player player = Bukkit.getPlayer(participant.getUniqueId());
-            if (player != null && player.isOnline()) player.setGameMode(BukkitGameMode.SPECTATOR);
+            if (player != null && player.isOnline()) player.setGameMode(org.bukkit.GameMode.SPECTATOR);
         }
 
         protected void announce(String message) {
