@@ -209,6 +209,21 @@ public final class BuiltinGameModes {
         }
 
         @Override public void onTick(Game game, long elapsedSeconds) {
+            if (game.getArena().spawnPoint("extraction").isPresent() && game.getMapInstance().isPresent()) {
+                org.bukkit.World world = plugin.getMapManager().getWorld(game.getMapInstance().orElseThrow());
+                org.bukkit.Location extraction = game.getArena().spawnPoint("extraction").orElseThrow().toLocation(world);
+                List<UUID> escaped = survivors.getMembers().stream()
+                        .filter(id -> game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false))
+                        .filter(id -> {
+                            Player player = Bukkit.getPlayer(id);
+                            return player != null && player.getWorld().equals(world)
+                                    && player.getLocation().distanceSquared(extraction) <= 16.0;
+                        }).toList();
+                if (!escaped.isEmpty()) {
+                    finish(game, GameOutcome.VICTORY, escaped, "Überlebende haben den Extraktionspunkt erreicht");
+                    return;
+                }
+            }
             if (timedOut(game, elapsedSeconds)) {
                 List<UUID> winners = survivors.getMembers().stream()
                         .filter(id -> game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).toList();
