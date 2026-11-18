@@ -1,12 +1,12 @@
 package de.jawollo07.manhunt;
 
-import de.jawollo07.manhunt.arena.ArenaCommand;
 import de.jawollo07.manhunt.arena.ArenaRepository;
 import de.jawollo07.manhunt.arena.ArenaService;
 import de.jawollo07.manhunt.game.GameLifecycleService;
 import de.jawollo07.manhunt.game.GameManager;
-import de.jawollo07.manhunt.modes.GameModeRegistry;
 import de.jawollo07.manhunt.map.MapManager;
+import de.jawollo07.manhunt.modes.GameModeFactory;
+import de.jawollo07.manhunt.modes.GameModeRegistry;
 import de.jawollo07.manhunt.player.PlayerManager;
 import de.jawollo07.manhunt.player.PlayerSessionListener;
 import de.jawollo07.manhunt.player.PlayerSnapshotRepository;
@@ -29,11 +29,11 @@ public final class ManHuntPlugin extends JavaPlugin {
     private ArenaRepository arenaRepository;
     private ArenaService arenaService;
     private StorageManager storageManager;
+    private ManHuntCommand commandHandler;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
-
         configManager = new ConfigManager(this);
         gameManager = new GameManager();
         gameModeRegistry = new GameModeRegistry();
@@ -67,15 +67,23 @@ public final class ManHuntPlugin extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        ArenaCommand arenaCommand = new ArenaCommand(this);
-        command.setExecutor(arenaCommand);
-        command.setTabCompleter(arenaCommand);
-
+        commandHandler = new ManHuntCommand(this);
+        command.setExecutor(commandHandler);
+        command.setTabCompleter(commandHandler);
         getLogger().info("ManHuntPlugin enabled. Core services initialized.");
+    }
+
+    /** Allows companion plugins to register independent, per-round mode factories. */
+    public void registerGameMode(GameModeFactory factory) {
+        if (gameModeRegistry == null) {
+            throw new IllegalStateException("ManHuntPlugin has not been enabled yet");
+        }
+        gameModeRegistry.register(factory);
     }
 
     @Override
     public void onDisable() {
+        if (commandHandler != null) commandHandler.shutdown();
         if (playerSnapshotService != null) {
             for (Player player : getServer().getOnlinePlayers()) {
                 try {
