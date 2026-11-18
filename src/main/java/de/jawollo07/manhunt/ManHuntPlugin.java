@@ -65,6 +65,11 @@ public final class ManHuntPlugin extends JavaPlugin {
                 this
         );
 
+        getServer().getPluginManager().registerEvents(
+                new de.jawollo07.manhunt.player.PlayerDeathListener(gameManager, gameLifecycleService),
+                this
+        );
+
         PluginCommand command = getCommand("manhunt");
         if (command == null) {
             getLogger().severe("The /manhunt command is missing from plugin.yml");
