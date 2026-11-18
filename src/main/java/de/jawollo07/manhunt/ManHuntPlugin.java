@@ -37,6 +37,10 @@ public final class ManHuntPlugin extends JavaPlugin {
         configManager = new ConfigManager(this);
         gameManager = new GameManager();
         gameModeRegistry = new GameModeRegistry();
+        for (de.jawollo07.manhunt.modes.GameModeFactory factory :
+                de.jawollo07.manhunt.modes.builtin.BuiltinGameModes.factories(this)) {
+            gameModeRegistry.register(factory);
+        }
         playerManager = new PlayerManager();
         mapManager = new MapManager(this);
         storageManager = new StorageManager(this, configManager);
