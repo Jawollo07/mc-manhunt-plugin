@@ -131,6 +131,10 @@ public final class BuiltinGameModes {
                 UUID target = players.get((i + 1) % players.size()).getUniqueId();
                 targets.put(current.getUniqueId(), target);
                 assign(game, current, assassins, "assassin");
+                Player owner = Bukkit.getPlayer(current.getUniqueId());
+                Player targetPlayer = Bukkit.getPlayer(target);
+                if (owner != null) owner.sendMessage("§cDein geheimes Ziel: §e"
+                        + (targetPlayer == null ? target.toString().substring(0, 8) : targetPlayer.getName()));
             }
             announce("Jeder Spieler hat ein geheimes Ziel. Eliminiere dein Ziel!");
         }
@@ -173,6 +177,10 @@ public final class BuiltinGameModes {
             for (int i = 0; i < players.size(); i++) {
                 boolean hunter = i < hitmanCount;
                 assign(game, players.get(i), hunter ? hitmen : survivors, hunter ? "hitman" : "survivor");
+                Player assigned = Bukkit.getPlayer(players.get(i).getUniqueId());
+                if (assigned != null) assigned.sendMessage(hunter
+                        ? "§cDu bist ein Hitman. Eliminiere alle Überlebenden!"
+                        : "§aDu bist Überlebender. Verstecke dich und überstehe das Zeitlimit!");
             }
             announce(hitmanCount + " Hitman(s) gegen " + (players.size() - hitmanCount) + " Überlebende!");
         }
@@ -293,6 +301,10 @@ public final class BuiltinGameModes {
             for (int i = 0; i < players.size(); i++) {
                 boolean isInfected = i < initial;
                 assign(game, players.get(i), isInfected ? infected : survivors, isInfected ? "infected" : "survivor");
+                Player assigned = Bukkit.getPlayer(players.get(i).getUniqueId());
+                if (assigned != null) assigned.sendMessage(isInfected
+                        ? "§2Du bist infiziert! Infiziere alle Überlebenden."
+                        : "§bDu bist Überlebender. Überlebe bis zum Zeitlimit!");
             }
             announce(initial + " Infizierte wurden ausgewählt. Überlebt bis zum Zeitlimit!");
         }
