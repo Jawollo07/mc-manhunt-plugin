@@ -2,7 +2,7 @@ package de.jawollo07.manhunt.modes.builtin;
 
 import de.jawollo07.manhunt.ManHuntPlugin;
 import de.jawollo07.manhunt.game.Game;
-import de.jawollo07.manhunt.game.GameMode;
+import de.jawollo07.manhunt.modes.GameMode;
 import de.jawollo07.manhunt.game.GameOutcome;
 import de.jawollo07.manhunt.game.GamePlayer;
 import de.jawollo07.manhunt.game.GameResult;
