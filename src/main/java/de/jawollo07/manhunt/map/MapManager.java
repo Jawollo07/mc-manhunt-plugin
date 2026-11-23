@@ -134,7 +134,7 @@ public final class MapManager {
         for (LoadedMap loaded : java.util.List.copyOf(instances.values())) {
             try {
                 deleteWorkingCopy(loaded.instance());
-            } catch (IOException exception) {
+            } catch (IOException | RuntimeException exception) {
                 if (failure == null) failure = new IOException("One or more temporary maps could not be deleted");
                 failure.addSuppressed(exception);
             }
