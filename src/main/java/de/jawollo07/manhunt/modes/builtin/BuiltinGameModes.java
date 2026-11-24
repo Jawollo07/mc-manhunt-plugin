@@ -208,6 +208,7 @@ public final class BuiltinGameModes {
         Hitman(ManHuntPlugin plugin) { super(plugin); }
         @Override public String getId() { return "hitman"; }
         @Override public String getDisplayName() { return "Hitman"; }
+        @Override public int getMinimumPlayers() { return 3; }
 
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
