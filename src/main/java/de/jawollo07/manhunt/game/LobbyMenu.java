@@ -21,9 +21,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class LobbyMenu implements Listener {
-    private static final int SIZE = 27;
-    private static final int ACTION_SLOT = 22;
-    private static final int REFRESH_SLOT = 26;
+    private static final int SIZE = 54;
+    private static final int ACTION_SLOT = 48;
+    private static final int ADMIN_SLOT = 45;
+    private static final int ARENA_SLOT = 50;
+    private static final int REFRESH_SLOT = 53;
     private final ManHuntPlugin plugin;
 
     public LobbyMenu(ManHuntPlugin plugin) {
@@ -86,7 +88,7 @@ public final class LobbyMenu implements Listener {
 
         int slot = 9;
         for (GamePlayer participant : game.getPlayers()) {
-            if (slot > 17) break;
+            if (slot > 44) break;
             OfflinePlayer offline = Bukkit.getOfflinePlayer(participant.getUniqueId());
             String name = offline.getName();
             if (name == null) name = participant.getUniqueId().toString().substring(0, 8);
@@ -101,7 +103,7 @@ public final class LobbyMenu implements Listener {
             }
             inventory.setItem(slot++, head);
         }
-        while (slot <= 17) inventory.setItem(slot++, item(Material.GRAY_STAINED_GLASS_PANE, "§8Freier Platz"));
+        while (slot <= 44) inventory.setItem(slot++, item(Material.GRAY_STAINED_GLASS_PANE, "§8Freier Platz"));
 
         boolean canJoin = (game.getState() == GameState.WAITING || game.getState() == GameState.LOBBY
                 || game.getState() == GameState.COUNTDOWN)
@@ -119,10 +121,10 @@ public final class LobbyMenu implements Listener {
                     "§7Die Runde läuft bereits, ist voll",
                     "§7oder du bist bereits dabei."));
         }
-        inventory.setItem(24, item(Material.MAP, "§eArena: " + game.getArena().displayName(),
+        inventory.setItem(ARENA_SLOT, item(Material.MAP, "§eArena: " + game.getArena().displayName(),
                 "§7Die Arena wird vom Admin festgelegt."));
         if (viewer.hasPermission("manhunt.admin")) {
-            inventory.setItem(20, item(Material.COMMAND_BLOCK, "§cAdmin-Menü",
+            inventory.setItem(ADMIN_SLOT, item(Material.COMMAND_BLOCK, "§cAdmin-Menü",
                     "§7Runde verwalten oder eine neue Runde vorbereiten."));
         }
         inventory.setItem(REFRESH_SLOT, item(Material.CLOCK, "§eAktualisieren",
@@ -137,7 +139,7 @@ public final class LobbyMenu implements Listener {
         if (event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
 
         int slot = event.getRawSlot();
-        if (slot == 20 && player.hasPermission("manhunt.admin")) {
+        if (slot == ADMIN_SLOT && player.hasPermission("manhunt.admin")) {
             plugin.getAdminMenu().open(player);
             return;
         }
