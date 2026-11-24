@@ -255,6 +255,11 @@ public final class ArenaManagementMenu implements Listener {
                         .filter(candidate -> !candidate.equals(world))
                         .findFirst().orElse(null);
                 if (fallbackWorld == null) {
+                    try {
+                        plugin.getMapManager().unloadTemplateAfterEditing(templateId);
+                    } catch (IllegalStateException ignored) {
+                        // Keep the world loaded if another player is already inside.
+                    }
                     player.sendMessage("§cEs gibt keine andere geladene Welt als Rückkehrziel.");
                     return;
                 }
