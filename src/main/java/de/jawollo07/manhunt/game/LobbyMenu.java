@@ -64,12 +64,12 @@ public final class LobbyMenu implements Listener {
                         "§8Die Modusauswahl erfolgt beim Erstellen",
                         "§8einer Runde durch einen Admin."));
             }
-            inventory.setItem(22, item(viewer.hasPermission("manhunt.admin") ? Material.EMERALD : Material.BARRIER,
+            inventory.setItem(ACTION_SLOT, item(viewer.hasPermission("manhunt.admin") ? Material.EMERALD : Material.BARRIER,
                     viewer.hasPermission("manhunt.admin") ? "§a§lRunde erstellen" : "§cNoch keine Runde",
                     viewer.hasPermission("manhunt.admin") ? "§7Öffnet die Admin-Auswahl für Modus und Arena."
                             : "§7Sobald ein Admin eine Runde erstellt,",
                     viewer.hasPermission("manhunt.admin") ? "§eKlicken zum Erstellen" : "§7kannst du hier direkt beitreten."));
-            inventory.setItem(26, item(Material.CLOCK, "§eAktualisieren", "§7Lobby neu laden"));
+            inventory.setItem(REFRESH_SLOT, item(Material.CLOCK, "§eAktualisieren", "§7Lobby neu laden"));
             return;
         }
 
