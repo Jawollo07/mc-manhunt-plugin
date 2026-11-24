@@ -47,7 +47,7 @@ public final class AdminMenu implements Listener {
             openModes(player);
             return;
         }
-        MenuHolder holder = new MenuHolder(Screen.OVERVIEW, null);
+        MenuHolder holder = new MenuHolder(Screen.OVERVIEW, null, null, 0);
         Inventory inventory = Bukkit.createInventory(holder, 27, Component.text("ManHunt • Rundenverwaltung"));
         holder.inventory = inventory;
         inventory.setItem(4, item(Material.COMPASS, "§e" + game.getMode().getDisplayName(),
@@ -178,7 +178,8 @@ public final class AdminMenu implements Listener {
             return;
         }
         int slot = event.getRawSlot();
-        if (slot == 49 || slot == 26 || (holder.screen == Screen.OVERVIEW && slot == 22)) {
+        if (slot == 49 || (holder.screen == Screen.SETTINGS && slot == 26)
+                || (holder.screen == Screen.OVERVIEW && slot == 22)) {
             player.closeInventory();
             return;
         }
