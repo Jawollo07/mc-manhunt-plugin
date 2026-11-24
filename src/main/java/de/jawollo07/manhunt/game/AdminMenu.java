@@ -73,7 +73,7 @@ public final class AdminMenu implements Listener {
     }
 
     private void openModes(Player player) {
-        MenuHolder holder = new MenuHolder(Screen.MODES, null);
+        MenuHolder holder = new MenuHolder(Screen.MODES, null, null, 0);
         Inventory inventory = Bukkit.createInventory(holder, SIZE, Component.text("ManHunt • Modus wählen"));
         holder.inventory = inventory;
         List<GameModeFactory> modes = new ArrayList<>(plugin.getGameModeRegistry().getAll());
@@ -90,7 +90,7 @@ public final class AdminMenu implements Listener {
     }
 
     private void openArenas(Player player, String modeId) {
-        MenuHolder holder = new MenuHolder(Screen.ARENAS, modeId);
+        MenuHolder holder = new MenuHolder(Screen.ARENAS, modeId, null, 0);
         Inventory inventory = Bukkit.createInventory(holder, SIZE, Component.text("ManHunt • Arena wählen"));
         holder.inventory = inventory;
         try {
@@ -115,7 +115,24 @@ public final class AdminMenu implements Listener {
         player.openInventory(inventory);
     }
 
-    private void createGame(Player player, String modeId, String arenaId) {
+    private void openSettings(Player player, String modeId, String arenaId, int maxPlayers) {
+        int minimum = plugin.getConfigManager().getInt("game.min-players", 2);
+        MenuHolder holder = new MenuHolder(Screen.SETTINGS, modeId, arenaId, Math.max(minimum, maxPlayers));
+        Inventory inventory = Bukkit.createInventory(holder, 27, Component.text("ManHunt • Spielerlimit"));
+        holder.inventory = inventory;
+        inventory.setItem(11, item(Material.REDSTONE, "§cWeniger Spieler", "§7Maximalspieler verringern"));
+        inventory.setItem(13, item(Material.PLAYER_HEAD, "§eMaximalspieler: §f" + holder.maxPlayers,
+                "§7Mindestens: §f" + minimum, "§7Höchstens: §f32"));
+        inventory.setItem(15, item(Material.EMERALD, "§aMehr Spieler", "§7Maximalspieler erhöhen"));
+        inventory.setItem(18, item(Material.ARROW, "§eZurück zur Arena-Auswahl"));
+        inventory.setItem(22, item(Material.LIME_DYE, "§a§lLobby erstellen",
+                "§7Modus: §f" + modeId, "§7Arena: §f" + arenaId,
+                "§7Spielerlimit: §f" + holder.maxPlayers));
+        inventory.setItem(26, item(Material.BARRIER, "§cSchließen"));
+        player.openInventory(inventory);
+    }
+
+    private void createGame(Player player, String modeId, String arenaId, int maxPlayers) {
         if (!player.hasPermission("manhunt.admin")) {
             player.sendMessage("§cDafür hast du keine Berechtigung.");
             return;
@@ -131,7 +148,7 @@ public final class AdminMenu implements Listener {
                     () -> new IllegalStateException("Die Arena ist nicht mehr verfügbar."));
             GameSettings settings = new GameSettings(
                     plugin.getConfigManager().getInt("game.min-players", 2),
-                    plugin.getConfigManager().getInt("game.max-players", 8),
+                    Math.max(plugin.getConfigManager().getInt("game.min-players", 2), maxPlayers),
                     plugin.getConfigManager().getInt("game.countdown-seconds", 10),
                     plugin.getConfigManager().getInt("game.time-limit-seconds", 2400),
                     plugin.getConfigManager().getBoolean("game.allow-late-join", false),
@@ -161,7 +178,7 @@ public final class AdminMenu implements Listener {
             return;
         }
         int slot = event.getRawSlot();
-        if (slot == 49 || (holder.screen == Screen.OVERVIEW && slot == 22)) {
+        if (slot == 49 || slot == 26 || (holder.screen == Screen.OVERVIEW && slot == 22)) {
             player.closeInventory();
             return;
         }
@@ -183,12 +200,30 @@ public final class AdminMenu implements Listener {
             openModes(player);
             return;
         }
+        if (holder.screen == Screen.SETTINGS) {
+            if (slot == 18) {
+                openArenas(player, holder.modeId);
+                return;
+            }
+            if (slot == 11 || slot == 15) {
+                int minimum = plugin.getConfigManager().getInt("game.min-players", 2);
+                int updated = slot == 11 ? Math.max(minimum, holder.maxPlayers - 1)
+                        : Math.min(32, holder.maxPlayers + 1);
+                openSettings(player, holder.modeId, holder.arenaId, updated);
+                return;
+            }
+            if (slot == 22) {
+                createGame(player, holder.modeId, holder.arenaId, holder.maxPlayers);
+                return;
+            }
+        }
         String selected = holder.entries.get(slot);
         if (selected == null) return;
         if (holder.screen == Screen.MODES) {
             openArenas(player, selected);
-        } else {
-            createGame(player, holder.modeId, selected);
+        } else if (holder.screen == Screen.ARENAS) {
+            int defaultMax = plugin.getConfigManager().getInt("game.max-players", 8);
+            openSettings(player, holder.modeId, selected, defaultMax);
         }
     }
 
@@ -208,17 +243,21 @@ public final class AdminMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { OVERVIEW, MODES, ARENAS }
+    private enum Screen { OVERVIEW, MODES, ARENAS, SETTINGS }
 
     private static final class MenuHolder implements InventoryHolder {
         private final Screen screen;
         private final String modeId;
+        private final String arenaId;
+        private final int maxPlayers;
         private final Map<Integer, String> entries = new HashMap<>();
         private Inventory inventory;
 
-        private MenuHolder(Screen screen, String modeId) {
+        private MenuHolder(Screen screen, String modeId, String arenaId, int maxPlayers) {
             this.screen = screen;
             this.modeId = modeId;
+            this.arenaId = arenaId;
+            this.maxPlayers = maxPlayers;
         }
 
         @Override public Inventory getInventory() { return inventory; }
