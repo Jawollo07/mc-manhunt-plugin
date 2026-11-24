@@ -74,7 +74,7 @@ public final class LobbyMenu implements Listener {
         inventory.setItem(2, item(Material.CLOCK, "§6" + stateName(game.getState()),
                 "§7Status: §f" + game.getState(),
                 game.getState() == GameState.COUNTDOWN
-                        ? "§7Der Start-Countdown läuft."
+                        ? "§eStart in: §f" + Math.max(0, game.getCountdownRemainingSeconds()) + " Sekunden"
                         : "§7Warte auf den Spielstart."));
         inventory.setItem(4, item(Material.COMPASS, "§e" + game.getMode().getDisplayName(),
                 "§7Spielmodus: §f" + game.getMode().getId(),
