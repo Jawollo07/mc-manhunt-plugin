@@ -34,6 +34,7 @@ public final class ArenaManagementMenu implements Listener {
     private final ManHuntPlugin plugin;
     private final Map<UUID, PendingInput> pendingInputs = new ConcurrentHashMap<>();
     private final Map<UUID, Location> editingReturnLocations = new ConcurrentHashMap<>();
+    private final Map<UUID, String> editingTemplateIds = new ConcurrentHashMap<>();
 
     public ArenaManagementMenu(ManHuntPlugin plugin) {
         this.plugin = plugin;
@@ -228,6 +229,12 @@ public final class ArenaManagementMenu implements Listener {
     public void enterTemplateForEditing(Player player, String templateId) {
         if (!allowed(player)) return;
         try {
+            String currentTemplate = editingTemplateIds.get(player.getUniqueId());
+            if (currentTemplate != null && !currentTemplate.equalsIgnoreCase(templateId)) {
+                player.sendMessage("§cDu bearbeitest bereits §e" + currentTemplate
+                        + "§c. Verlasse diese Vorlage zuerst, bevor du eine andere öffnest.");
+                return;
+            }
             World world = plugin.getMapManager().loadTemplateForEditing(templateId);
             if (!player.getWorld().equals(world)) {
                 editingReturnLocations.putIfAbsent(player.getUniqueId(), player.getLocation().clone());
@@ -236,6 +243,7 @@ public final class ArenaManagementMenu implements Listener {
                     return;
                 }
             }
+            editingTemplateIds.put(player.getUniqueId(), templateId);
             player.closeInventory();
             player.sendMessage("§aDu bearbeitest jetzt die Originalvorlage §e" + templateId + "§a.");
             player.sendMessage("§7Nutze §e/manhunt arenas §7für Spawnpunkte. Mit §eVorlage verlassen §7kehrst du zurück.");
@@ -248,19 +256,19 @@ public final class ArenaManagementMenu implements Listener {
     public void leaveTemplateEditing(Player player) {
         if (!allowed(player)) return;
         Location returnLocation = editingReturnLocations.remove(player.getUniqueId());
-        if (returnLocation == null) {
+        String templateId = editingTemplateIds.remove(player.getUniqueId());
+        if (returnLocation == null || templateId == null) {
             player.sendMessage("§eFür dich ist keine aktive Vorlagenbearbeitung gespeichert.");
             return;
         }
         if (!player.teleport(returnLocation)) {
             editingReturnLocations.put(player.getUniqueId(), returnLocation);
+            editingTemplateIds.put(player.getUniqueId(), templateId);
             player.sendMessage("§cRückteleport fehlgeschlagen. Du befindest dich weiterhin in der Vorlagenwelt.");
             return;
         }
-        String templateId = returnLocation.getWorld() == null ? null : player.getWorld().getName();
         player.sendMessage("§aDu hast die Vorlagenwelt verlassen.");
-        if (templateId != null) {
-            Bukkit.getScheduler().runTask(plugin, () -> {
+        Bukkit.getScheduler().runTask(plugin, () -> {
                 try {
                     boolean unloaded = plugin.getMapManager().unloadTemplateAfterEditing(templateId);
                     if (unloaded) player.sendMessage("§aDie Vorlagenwelt wurde gespeichert und entladen.");
@@ -268,8 +276,7 @@ public final class ArenaManagementMenu implements Listener {
                 } catch (IllegalStateException exception) {
                     player.sendMessage("§eDie Vorlage bleibt geladen, da sich noch andere Spieler darin befinden.");
                 }
-            });
-        }
+        });
     }
 
     private void createFromTemplate(Player player, String templateId) {
