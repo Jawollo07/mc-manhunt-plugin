@@ -202,6 +202,8 @@ public final class AdminMenu implements Listener {
             } else if (active.getState() == GameState.LOBBY || active.getState() == GameState.WAITING) {
                 Bukkit.dispatchCommand(player, "manhunt game start");
                 open(player);
+            } else {
+                player.closeInventory();
             }
             return;
         }
