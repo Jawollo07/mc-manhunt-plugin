@@ -3,7 +3,10 @@ package de.jawollo07.manhunt.game;
 import de.jawollo07.manhunt.ManHuntPlugin;
 import de.jawollo07.manhunt.arena.Arena;
 import de.jawollo07.manhunt.modes.GameModeFactory;
+import net.kyori.adventure.bossbar.BossBar;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.Sound;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -23,6 +26,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     private BukkitTask countdownTask;
     private BukkitTask gameTickTask;
     private int countdownRemaining = -1;
+    private BossBar gameBossBar;
 
     public GameCommand(ManHuntPlugin plugin) {
         this.plugin = plugin;
@@ -162,6 +166,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         countdownRemaining = game.getSettings().countdownSeconds();
         Bukkit.broadcastMessage("§6[ManHunt] §eGenügend Spieler! Die Runde startet in "
                 + countdownRemaining + " Sekunden.");
+        playGameSound(game, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 1.2f);
         if (countdownRemaining <= 0) {
             countdownRemaining = -1;
             launch(game);
@@ -186,6 +191,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                 launch(game);
             } else if (countdownRemaining <= 5 || countdownRemaining % 5 == 0) {
                 Bukkit.broadcastMessage("§6[ManHunt] §eStart in " + countdownRemaining + "...");
+                playGameSound(game, Sound.BLOCK_NOTE_BLOCK_HAT, 0.7f, countdownRemaining <= 3 ? 1.6f : 1.2f);
             }
         }, 20L, 20L);
     }
@@ -218,6 +224,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
             plugin.getGameLifecycleService().prepare();
             plugin.getGameLifecycleService().start();
             Bukkit.broadcastMessage("§a[ManHunt] Die Runde hat begonnen!");
+            playGameSound(game, Sound.ENTITY_PLAYER_LEVELUP, 0.9f, 1.0f);
             startGameTicker(game);
         } catch (RuntimeException exception) {
             plugin.getLogger().severe("Could not start game " + game.getId() + ": " + exception.getMessage());
@@ -353,6 +360,8 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
             try {
                 elapsed[0]++;
                 plugin.getGameLifecycleService().tick(elapsed[0]);
+                if (game.getState() == GameState.RUNNING) updateGameHud(game, elapsed[0]);
+                else cancelGameTicker();
             } catch (RuntimeException exception) {
                 plugin.getLogger().severe("Game tick failed for " + game.getId() + ": " + exception.getMessage());
                 cancelGameTicker();
@@ -364,6 +373,42 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         if (gameTickTask != null) {
             gameTickTask.cancel();
             gameTickTask = null;
+        }
+        if (gameBossBar != null) {
+            gameBossBar.removeAll();
+            gameBossBar = null;
+        }
+    }
+
+    private void updateGameHud(Game game, long elapsedSeconds) {
+        int limit = game.getSettings().timeLimitSeconds();
+        long remaining = limit > 0 ? Math.max(0, limit - elapsedSeconds) : -1;
+        String elapsedText = formatTime(elapsedSeconds);
+        String title = "§6" + game.getMode().getDisplayName() + " §8• §f" + elapsedText
+                + (remaining >= 0 ? " §8| §e" + formatTime(remaining) : "");
+        if (gameBossBar == null) {
+            gameBossBar = Bukkit.createBossBar(title, BossBar.Color.GREEN, BossBar.Overlay.PROGRESS);
+        }
+        gameBossBar.setName(title);
+        gameBossBar.setProgress(limit > 0 ? Math.max(0.0, Math.min(1.0, (double) remaining / limit)) : 1.0);
+        String actionBar = "§e" + game.getMode().getDisplayName() + " §8• §f" + elapsedText
+                + (remaining >= 0 ? " §8• §cNoch " + formatTime(remaining) : "");
+        for (GamePlayer participant : game.getPlayers()) {
+            Player player = Bukkit.getPlayer(participant.getUniqueId());
+            if (player == null || !player.isOnline()) continue;
+            if (!gameBossBar.getPlayers().contains(player)) gameBossBar.addPlayer(player);
+            player.sendActionBar(LegacyComponentSerializer.legacySection().deserialize(actionBar));
+        }
+    }
+
+    private String formatTime(long seconds) {
+        return String.format(Locale.ROOT, "%02d:%02d", seconds / 60, seconds % 60);
+    }
+
+    private void playGameSound(Game game, Sound sound, float volume, float pitch) {
+        for (GamePlayer participant : game.getPlayers()) {
+            Player player = Bukkit.getPlayer(participant.getUniqueId());
+            if (player != null && player.isOnline()) player.playSound(player.getLocation(), sound, volume, pitch);
         }
     }
 
