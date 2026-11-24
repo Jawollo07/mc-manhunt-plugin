@@ -2,6 +2,7 @@ package de.jawollo07.manhunt.modes.builtin;
 
 import de.jawollo07.manhunt.game.Game;
 import de.jawollo07.manhunt.game.GameManager;
+import de.jawollo07.manhunt.player.PlayerStatus;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -9,6 +10,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffect;
@@ -30,6 +32,7 @@ public final class JuggernautAbilityListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onInteract(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) return;
         Action action = event.getAction();
         if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
         Player boss = event.getPlayer();
@@ -43,7 +46,7 @@ public final class JuggernautAbilityListener implements Listener {
                 event.setCancelled(true);
                 if (!ready(boss, "slam", 15)) return;
                 for (Player target : boss.getWorld().getPlayers()) {
-                    if (target.equals(boss) || target.getLocation().distanceSquared(boss.getLocation()) > 36) continue;
+                    if (!isActiveHunter(game, target) || target.getLocation().distanceSquared(boss.getLocation()) > 36) continue;
                     target.damage(8.0, boss);
                     target.setVelocity(target.getVelocity().add(new Vector(0, 0.85, 0)));
                 }
@@ -61,7 +64,7 @@ public final class JuggernautAbilityListener implements Listener {
                 event.setCancelled(true);
                 if (!ready(boss, "roar", 20)) return;
                 for (Player target : boss.getWorld().getPlayers()) {
-                    if (target.equals(boss) || target.getLocation().distanceSquared(boss.getLocation()) > 100) continue;
+                    if (!isActiveHunter(game, target) || target.getLocation().distanceSquared(boss.getLocation()) > 100) continue;
                     target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 100, 1, true, true, true));
                     target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 100, 0, true, true, true));
                 }
@@ -76,6 +79,15 @@ public final class JuggernautAbilityListener implements Listener {
             }
             default -> { }
         }
+    }
+
+    private boolean isActiveHunter(Game game, Player target) {
+        return game.hasPlayer(target.getUniqueId())
+                && game.getPlayer(target.getUniqueId())
+                .filter(participant -> participant.getStatus() == PlayerStatus.PLAYING)
+                .isPresent()
+                && !game.getRoleManager().getRoleId(target.getUniqueId())
+                .filter("juggernaut"::equals).isPresent();
     }
 
     private boolean ready(Player player, String ability, long seconds) {
