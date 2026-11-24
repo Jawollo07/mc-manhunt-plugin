@@ -62,9 +62,11 @@ public final class LobbyMenu implements Listener {
                         "§8Die Modusauswahl erfolgt beim Erstellen",
                         "§8einer Runde durch einen Admin."));
             }
-            inventory.setItem(22, item(Material.BARRIER, "§cNoch keine Runde",
-                    "§7Sobald ein Admin eine Runde erstellt,",
-                    "§7kannst du hier direkt beitreten."));
+            inventory.setItem(22, item(viewer.hasPermission("manhunt.admin") ? Material.EMERALD : Material.BARRIER,
+                    viewer.hasPermission("manhunt.admin") ? "§a§lRunde erstellen" : "§cNoch keine Runde",
+                    viewer.hasPermission("manhunt.admin") ? "§7Öffnet die Admin-Auswahl für Modus und Arena."
+                            : "§7Sobald ein Admin eine Runde erstellt,",
+                    viewer.hasPermission("manhunt.admin") ? "§eKlicken zum Erstellen" : "§7kannst du hier direkt beitreten."));
             inventory.setItem(26, item(Material.CLOCK, "§eAktualisieren", "§7Lobby neu laden"));
             return;
         }
@@ -119,6 +121,10 @@ public final class LobbyMenu implements Listener {
         }
         inventory.setItem(24, item(Material.MAP, "§eArena: " + game.getArena().displayName(),
                 "§7Die Arena wird vom Admin festgelegt."));
+        if (viewer.hasPermission("manhunt.admin")) {
+            inventory.setItem(20, item(Material.COMMAND_BLOCK, "§cAdmin-Menü",
+                    "§7Runde verwalten oder eine neue Runde vorbereiten."));
+        }
         inventory.setItem(REFRESH_SLOT, item(Material.CLOCK, "§eAktualisieren",
                 "§7Spielerliste und Status neu laden."));
     }
@@ -131,6 +137,10 @@ public final class LobbyMenu implements Listener {
         if (event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
 
         int slot = event.getRawSlot();
+        if (slot == 20 && player.hasPermission("manhunt.admin")) {
+            plugin.getAdminMenu().open(player);
+            return;
+        }
         if (slot == REFRESH_SLOT) {
             render(player, event.getView().getTopInventory());
             return;
@@ -139,7 +149,8 @@ public final class LobbyMenu implements Listener {
 
         Game game = plugin.getGameManager().getActiveGame().orElse(null);
         if (game == null) {
-            render(player, event.getView().getTopInventory());
+            if (player.hasPermission("manhunt.admin")) plugin.getAdminMenu().open(player);
+            else render(player, event.getView().getTopInventory());
             return;
         }
         boolean canJoin = (game.getState() == GameState.WAITING || game.getState() == GameState.LOBBY
