@@ -33,6 +33,11 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
 
         try {
             switch (args[1].toLowerCase(Locale.ROOT)) {
+                case "gui" -> openGui(sender);
+                case "templates" -> templates(sender);
+                case "validate" -> validate(sender, args);
+                case "rename" -> rename(sender, args);
+                case "settemplate" -> setTemplate(sender, args);
                 case "list" -> list(sender);
                 case "create" -> create(sender, args);
                 case "delete" -> delete(sender, args);
@@ -64,18 +69,26 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
     }
 
     private void create(CommandSender sender, String[] args) throws SQLException {
-        if (args.length < 5) {
-            sender.sendMessage("§cVerwendung: /manhunt arena create <id> <template> <Anzeigename>");
+        if (args.length < 4) {
+            sender.sendMessage("§cVerwendung: /manhunt arena create <id> <template> [Anzeigename]");
             return;
         }
-        String displayName = String.join(" ", java.util.Arrays.copyOfRange(args, 4, args.length));
+        var template = plugin.getMapManager().inspectTemplate(args[3]);
+        if (!template.valid()) throw new IllegalArgumentException("Ungültige Kartenvorlage: " + template.status());
+        String displayName = args.length > 4 ? String.join(" ", java.util.Arrays.copyOfRange(args, 4, args.length))
+                : args[2].replace('_', ' ').replace('-', ' ');
         Arena arena = new Arena(args[2], displayName, args[3]);
         plugin.getArenaService().save(arena);
         sender.sendMessage("§aArena §e" + arena.id() + " §awurde gespeichert.");
+        if (template.loaded()) sender.sendMessage("§eHinweis: Die Vorlagenwelt ist geladen und muss vor dem Spielstart entladen werden.");
     }
 
     private void delete(CommandSender sender, String[] args) throws SQLException {
         requireArgs(args, 3, "Verwendung: /manhunt arena delete <id>");
+        var active = plugin.getGameManager().getActiveGame().orElse(null);
+        if (active != null && active.getArena().id().equalsIgnoreCase(args[2])) {
+            throw new IllegalStateException("Diese Arena wird gerade in einer Runde verwendet.");
+        }
         if (plugin.getArenaService().delete(args[2])) {
             sender.sendMessage("§aArena §e" + args[2] + " §awurde gelöscht.");
         } else {
@@ -88,7 +101,9 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         Arena arena = plugin.getArenaService().find(args[2]).orElseThrow(
                 () -> new IllegalArgumentException("Arena nicht gefunden: " + args[2]));
         sender.sendMessage("§6Arena: §e" + arena.displayName() + " §7(" + arena.id() + ")");
-        sender.sendMessage("§7Kartenvorlage: §f" + arena.worldName());
+        var template = plugin.getMapManager().inspectTemplate(arena.worldName());
+        sender.sendMessage("§7Kartenvorlage: §f" + arena.worldName() + " " + (template.valid() ? (template.loaded() ? "§e[geladen]" : "§a[bereit]") : "§c[ungültig]"));
+        sender.sendMessage("§7Vorlagenprüfung: §f" + template.status());
         if (arena.spawnPoints().isEmpty()) {
             sender.sendMessage("§eKeine Spawnpunkte konfiguriert; Weltspawn wird verwendet.");
         } else {
@@ -105,6 +120,9 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         }
         Arena arena = plugin.getArenaService().find(args[2]).orElseThrow(
                 () -> new IllegalArgumentException("Arena nicht gefunden: " + args[2]));
+        if (!player.getWorld().getName().equals(arena.worldName())) {
+            throw new IllegalArgumentException("Du musst dich zum Setzen des Spawnpunkts in der Vorlagenwelt " + arena.worldName() + " befinden.");
+        }
         Location location = player.getLocation();
         ArenaSpawnPoint point = new ArenaSpawnPoint(args[3],
                 location.getX(), location.getY(), location.getZ(),
@@ -127,12 +145,74 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§aSpawnpunkt wurde entfernt.");
     }
 
+    private void openGui(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cDieses Menü kann nur ingame geöffnet werden.");
+            return;
+        }
+        plugin.getArenaManagementMenu().open(player);
+    }
+
+    private void templates(CommandSender sender) throws java.io.IOException {
+        var templates = plugin.getMapManager().listTemplates();
+        if (templates.isEmpty()) {
+            sender.sendMessage("§eKeine Weltvorlagen gefunden.");
+            return;
+        }
+        sender.sendMessage("§6Gefundene Kartenvorlagen:");
+        for (var template : templates) {
+            sender.sendMessage((template.valid() ? "§a" : "§c") + template.id()
+                    + " §7- " + template.status());
+        }
+    }
+
+    private void validate(CommandSender sender, String[] args) throws SQLException {
+        requireArgs(args, 3, "Verwendung: /manhunt arena validate <id>");
+        Arena arena = plugin.getArenaService().find(args[2]).orElseThrow(
+                () -> new IllegalArgumentException("Arena nicht gefunden: " + args[2]));
+        var template = plugin.getMapManager().inspectTemplate(arena.worldName());
+        sender.sendMessage("§6Prüfung: §e" + arena.displayName());
+        sender.sendMessage((template.valid() ? "§a✔ " : "§c✘ ") + "Kartenvorlage: " + template.status());
+        sender.sendMessage((arena.spawnPoint("default").isPresent() ? "§a✔ " : "§e! ")
+                + "Standard-Spawnpunkt " + (arena.spawnPoint("default").isPresent() ? "konfiguriert" : "fehlt (Weltspawn wird verwendet)"));
+        if (arena.spawnPoint("extraction").isPresent()) sender.sendMessage("§a✔ Extraktionspunkt konfiguriert");
+        sender.sendMessage("§7Weitere Spawnpunkte: §f" + arena.spawnPoints().size());
+        if (!template.valid()) sender.sendMessage("§cDiese Arena kann nicht gestartet werden, bis die Vorlage repariert ist.");
+        else if (template.loaded()) sender.sendMessage("§eVorlagenwelt vor dem Start entladen.");
+        else sender.sendMessage("§aVorlage ist bereit für eine Spielrunde.");
+    }
+
+    private void rename(CommandSender sender, String[] args) throws SQLException {
+        requireArgs(args, 4, "Verwendung: /manhunt arena rename <id> <neuer Anzeigename>");
+        Arena arena = plugin.getArenaService().find(args[2]).orElseThrow(
+                () -> new IllegalArgumentException("Arena nicht gefunden: " + args[2]));
+        String name = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
+        plugin.getArenaService().save(new Arena(arena.id(), name, arena.worldName(), arena.spawnPoints()));
+        sender.sendMessage("§aAnzeigename geändert zu §e" + name);
+    }
+
+    private void setTemplate(CommandSender sender, String[] args) throws SQLException {
+        requireArgs(args, 4, "Verwendung: /manhunt arena settemplate <id> <template>");
+        Arena arena = plugin.getArenaService().find(args[2]).orElseThrow(
+                () -> new IllegalArgumentException("Arena nicht gefunden: " + args[2]));
+        var template = plugin.getMapManager().inspectTemplate(args[3]);
+        if (!template.valid()) throw new IllegalArgumentException("Ungültige Kartenvorlage: " + template.status());
+        plugin.getArenaService().save(new Arena(arena.id(), arena.displayName(), args[3], arena.spawnPoints()));
+        sender.sendMessage("§aKartenvorlage auf §e" + args[3] + " §agesetzt.");
+        if (template.loaded()) sender.sendMessage("§eHinweis: Welt muss vor Spielstart entladen werden.");
+    }
+
     private void requireArgs(String[] args, int count, String usage) {
         if (args.length < count) throw new IllegalArgumentException(usage);
     }
 
     private void sendHelp(CommandSender sender, String label) {
         sender.sendMessage("§6ManHunt Arena-Verwaltung:");
+        sender.sendMessage("§e/" + label + " arena gui §7(komfortable GUI)");
+        sender.sendMessage("§e/" + label + " arena templates");
+        sender.sendMessage("§e/" + label + " arena validate <id>");
+        sender.sendMessage("§e/" + label + " arena rename <id> <Anzeigename>");
+        sender.sendMessage("§e/" + label + " arena settemplate <id> <template>");
         sender.sendMessage("§e/" + label + " arena list");
         sender.sendMessage("§e/" + label + " arena create <id> <template> <Anzeigename>");
         sender.sendMessage("§e/" + label + " arena delete <id>");
@@ -146,10 +226,10 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         if (!sender.hasPermission("manhunt.admin")) return List.of();
         if (args.length == 1) return filter(List.of("arena"), args[0]);
         if (args.length == 2 && args[0].equalsIgnoreCase("arena")) {
-            return filter(List.of("list", "create", "delete", "info", "setspawn", "delspawn"), args[1]);
+            return filter(List.of("gui", "templates", "list", "create", "delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn"), args[1]);
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("arena")
-                && List.of("delete", "info", "setspawn", "delspawn").contains(args[1].toLowerCase(Locale.ROOT))) {
+                && List.of("delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn").contains(args[1].toLowerCase(Locale.ROOT))) {
             try {
                 return filter(plugin.getArenaService().findAll().stream().map(Arena::id).toList(), args[2]);
             } catch (SQLException exception) {
