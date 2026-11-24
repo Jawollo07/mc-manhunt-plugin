@@ -46,6 +46,7 @@ public final class StatisticsCommand implements CommandExecutor, TabCompleter {
             return;
         }
         try {
+            if ("all".equalsIgnoreCase(modeId)) modeId = null;
             var stats = plugin.getStatisticsRepository().getPlayerStatistics(player.getUniqueId(), modeId);
             if (stats.isEmpty()) {
                 sender.sendMessage("§eFür dich liegen" + (modeId == null ? "" : " im Modus §6" + modeId + "§e")
@@ -66,6 +67,7 @@ public final class StatisticsCommand implements CommandExecutor, TabCompleter {
 
     private void showLeaderboard(CommandSender sender, String modeId) {
         try {
+            if ("all".equalsIgnoreCase(modeId)) modeId = null;
             List<LeaderboardEntry> entries = plugin.getStatisticsRepository().getLeaderboard(modeId, 10);
             sender.sendMessage("§6ManHunt-Bestenliste" + (modeId == null ? " §7(Gesamt)" : " §7(" + modeId + ")"));
             if (entries.isEmpty()) {
