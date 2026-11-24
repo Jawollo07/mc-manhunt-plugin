@@ -10,6 +10,7 @@ import de.jawollo07.manhunt.game.GameState;
 import de.jawollo07.manhunt.modes.GameModeFactory;
 import de.jawollo07.manhunt.player.PlayerStatus;
 import de.jawollo07.manhunt.teams.Team;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -151,16 +152,39 @@ public final class BuiltinGameModes {
             eliminate(game, victim);
             if (killerId != null && !killerId.equals(victim.getUniqueId())
                     && game.getPlayer(killerId).filter(p -> p.getStatus() == PlayerStatus.PLAYING).isPresent()) {
-                targets.put(killerId, nextTarget);
+                if (nextTarget == null) {
+                    targets.remove(killerId);
+                } else {
+                    targets.put(killerId, nextTarget);
+                }
                 game.getRoleManager().assign(killerId, "assassin");
                 Player killer = Bukkit.getPlayer(killerId);
-                if (killer != null) killer.sendMessage("§aDein neues Ziel wurde dir zugewiesen.");
+                if (killer != null) {
+                    String nextName = nextTarget == null ? "Kein weiteres Ziel" :
+                            java.util.Optional.ofNullable(Bukkit.getPlayer(nextTarget))
+                                    .map(Player::getName)
+                                    .orElseGet(() -> {
+                                        String offlineName = Bukkit.getOfflinePlayer(nextTarget).getName();
+                                        return offlineName == null ? nextTarget.toString().substring(0, 8) : offlineName;
+                                    });
+                    killer.sendMessage("§aNeues Ziel: §e" + nextName);
+                }
             }
             List<UUID> alive = activePlayers(game);
             if (alive.size() <= 1) finish(game, GameOutcome.VICTORY, alive, "Letzter Assassine übrig");
         }
 
         @Override public void onTick(Game game, long elapsedSeconds) {
+            for (Map.Entry<UUID, UUID> assignment : targets.entrySet()) {
+                Player hunter = Bukkit.getPlayer(assignment.getKey());
+                if (hunter == null || !hunter.isOnline() || hunter.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue;
+                Player target = Bukkit.getPlayer(assignment.getValue());
+                String targetName = target != null ? target.getName() :
+                        java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(assignment.getValue()).getName())
+                                .orElse(assignment.getValue().toString().substring(0, 8));
+                hunter.sendActionBar(LegacyComponentSerializer.legacySection()
+                        .deserialize("§cDein Ziel: §e" + targetName));
+            }
             if (timedOut(game, elapsedSeconds)) finish(game, GameOutcome.TIMEOUT, activePlayers(game), "Zeitlimit erreicht");
         }
     }
