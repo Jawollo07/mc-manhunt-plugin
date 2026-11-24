@@ -34,6 +34,8 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         try {
             switch (args[1].toLowerCase(Locale.ROOT)) {
                 case "gui" -> openGui(sender);
+                case "edit" -> editTemplate(sender, args);
+                case "leave" -> leaveTemplate(sender);
                 case "templates" -> templates(sender);
                 case "validate" -> validate(sender, args);
                 case "rename" -> rename(sender, args);
@@ -153,6 +155,23 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         plugin.getArenaManagementMenu().open(player);
     }
 
+    private void editTemplate(CommandSender sender, String[] args) throws java.io.IOException {
+        requireArgs(args, 3, "Verwendung: /manhunt arena edit <Vorlagen-ID>");
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cDieser Befehl kann nur ingame ausgeführt werden.");
+            return;
+        }
+        plugin.getArenaManagementMenu().enterTemplateForEditing(player, args[2]);
+    }
+
+    private void leaveTemplate(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cDieser Befehl kann nur ingame ausgeführt werden.");
+            return;
+        }
+        plugin.getArenaManagementMenu().leaveTemplateEditing(player);
+    }
+
     private void templates(CommandSender sender) throws java.io.IOException {
         var templates = plugin.getMapManager().listTemplates();
         if (templates.isEmpty()) {
@@ -209,6 +228,8 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
     private void sendHelp(CommandSender sender, String label) {
         sender.sendMessage("§6ManHunt Arena-Verwaltung:");
         sender.sendMessage("§e/" + label + " arena gui §7(komfortable GUI)");
+        sender.sendMessage("§e/" + label + " arena edit <Vorlagen-ID> §7(Welt laden und betreten)");
+        sender.sendMessage("§e/" + label + " arena leave §7(zurückkehren und entladen)");
         sender.sendMessage("§e/" + label + " arena templates");
         sender.sendMessage("§e/" + label + " arena validate <id>");
         sender.sendMessage("§e/" + label + " arena rename <id> <Anzeigename>");
@@ -226,7 +247,14 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         if (!sender.hasPermission("manhunt.admin")) return List.of();
         if (args.length == 1) return filter(List.of("arena"), args[0]);
         if (args.length == 2 && args[0].equalsIgnoreCase("arena")) {
-            return filter(List.of("gui", "templates", "list", "create", "delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn"), args[1]);
+            return filter(List.of("gui", "edit", "leave", "templates", "list", "create", "delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn"), args[1]);
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("edit")) {
+            try {
+                return filter(plugin.getMapManager().listTemplates().stream().map(template -> template.id()).toList(), args[2]);
+            } catch (java.io.IOException exception) {
+                return List.of();
+            }
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("arena")
                 && List.of("delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn").contains(args[1].toLowerCase(Locale.ROOT))) {
