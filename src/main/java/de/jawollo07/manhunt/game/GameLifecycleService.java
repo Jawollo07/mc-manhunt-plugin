@@ -6,12 +6,14 @@ import de.jawollo07.manhunt.map.MapInstance;
 import de.jawollo07.manhunt.map.MapManager;
 import de.jawollo07.manhunt.player.PlayerManager;
 import de.jawollo07.manhunt.player.PlayerSnapshotService;
+import de.jawollo07.manhunt.stats.GameStatisticsRepository;
 import de.jawollo07.manhunt.teams.Team;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -24,10 +26,11 @@ public final class GameLifecycleService {
     private final PlayerSnapshotService snapshotService;
     private final PlayerManager playerManager;
     private final MapManager mapManager;
+    private final GameStatisticsRepository statisticsRepository;
 
     /** Constructor for core-only use and tests that do not interact with Bukkit. */
     public GameLifecycleService(GameManager gameManager) {
-        this(gameManager, null, null, null);
+        this(gameManager, null, null, null, null);
     }
 
     public GameLifecycleService(
@@ -35,7 +38,7 @@ public final class GameLifecycleService {
             PlayerSnapshotService snapshotService,
             PlayerManager playerManager
     ) {
-        this(gameManager, snapshotService, playerManager, null);
+        this(gameManager, snapshotService, playerManager, null, null);
     }
 
     public GameLifecycleService(
@@ -44,6 +47,16 @@ public final class GameLifecycleService {
             PlayerManager playerManager,
             MapManager mapManager
     ) {
+        this(gameManager, snapshotService, playerManager, mapManager, null);
+    }
+
+    public GameLifecycleService(
+            GameManager gameManager,
+            PlayerSnapshotService snapshotService,
+            PlayerManager playerManager,
+            MapManager mapManager,
+            GameStatisticsRepository statisticsRepository
+    ) {
         this.gameManager = Objects.requireNonNull(gameManager, "gameManager");
         if ((snapshotService == null) != (playerManager == null)) {
             throw new IllegalArgumentException("Snapshot and player services must be provided together");
@@ -51,6 +64,7 @@ public final class GameLifecycleService {
         this.snapshotService = snapshotService;
         this.playerManager = playerManager;
         this.mapManager = mapManager;
+        this.statisticsRepository = statisticsRepository;
     }
 
     /**
@@ -157,8 +171,16 @@ public final class GameLifecycleService {
         try {
             game.getMode().onEnd(game);
         } finally {
-            // Offline players keep their durable snapshots until reconnect.
-            restoreOnlineParticipants(game);
+            try {
+                if (statisticsRepository != null) {
+                    statisticsRepository.recordGame(game, result);
+                }
+            } catch (SQLException exception) {
+                throw new IllegalStateException("Could not persist game history and statistics", exception);
+            } finally {
+                // Offline players keep their durable snapshots until reconnect.
+                restoreOnlineParticipants(game);
+            }
         }
     }
 
