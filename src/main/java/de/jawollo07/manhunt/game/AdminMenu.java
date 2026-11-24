@@ -61,12 +61,13 @@ public final class AdminMenu implements Listener {
             inventory.setItem(slot++, item(Material.PLAYER_HEAD, "§a" + (name == null ? participant.getUniqueId().toString().substring(0, 8) : name),
                     "§7Status: §f" + participant.getStatus()));
         }
+        inventory.setItem(24, item(Material.MAP, "§aArenen verwalten",
+                "§7Arenen, Vorlagen und Spawnpunkte bearbeiten."));
         if (game.getState() == GameState.ENDING || game.getState() == GameState.RESETTING) {
             inventory.setItem(20, item(Material.CLOCK, "§eReset / Aufräumen",
                     "§7Stellt Spieler wieder her und entfernt die temporäre Map."));
         } else {
-            inventory.setItem(24, item(Material.MAP, "§aArenen verwalten", "§7Arenen, Vorlagen und Spawnpunkte bearbeiten."));
-        inventory.setItem(20, item(Material.REDSTONE_BLOCK, "§cRunde stoppen",
+            inventory.setItem(20, item(Material.REDSTONE_BLOCK, "§cRunde stoppen",
                     "§7Beendet die aktuelle Runde und stellt Spieler wieder her."));
         }
         if (game.getState() == GameState.COUNTDOWN) {
