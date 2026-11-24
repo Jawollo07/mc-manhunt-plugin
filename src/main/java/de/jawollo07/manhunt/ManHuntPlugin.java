@@ -13,6 +13,7 @@ import de.jawollo07.manhunt.player.PlayerSnapshotRepository;
 import de.jawollo07.manhunt.player.PlayerSnapshotService;
 import de.jawollo07.manhunt.storage.ConfigManager;
 import de.jawollo07.manhunt.storage.StorageManager;
+import de.jawollo07.manhunt.stats.GameStatisticsRepository;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -29,6 +30,7 @@ public final class ManHuntPlugin extends JavaPlugin {
     private ArenaRepository arenaRepository;
     private ArenaService arenaService;
     private StorageManager storageManager;
+    private GameStatisticsRepository statisticsRepository;
     private ManHuntCommand commandHandler;
 
     @Override
@@ -51,6 +53,7 @@ public final class ManHuntPlugin extends JavaPlugin {
             playerSnapshotService = new PlayerSnapshotService(playerSnapshotRepository);
             arenaRepository = new ArenaRepository(storageManager);
             arenaService = new ArenaService(arenaRepository);
+            statisticsRepository = new GameStatisticsRepository(storageManager);
         } catch (Exception exception) {
             getLogger().severe("Could not initialize the plugin database: " + exception.getMessage());
             getServer().getPluginManager().disablePlugin(this);
@@ -58,7 +61,7 @@ public final class ManHuntPlugin extends JavaPlugin {
         }
 
         gameLifecycleService = new GameLifecycleService(
-                gameManager, playerSnapshotService, playerManager, mapManager
+                gameManager, playerSnapshotService, playerManager, mapManager, statisticsRepository
         );
         getServer().getPluginManager().registerEvents(
                 new PlayerSessionListener(gameManager, gameLifecycleService, playerSnapshotService),
@@ -130,4 +133,5 @@ public final class ManHuntPlugin extends JavaPlugin {
     public ArenaRepository getArenaRepository() { return arenaRepository; }
     public ArenaService getArenaService() { return arenaService; }
     public StorageManager getStorageManager() { return storageManager; }
+    public GameStatisticsRepository getStatisticsRepository() { return statisticsRepository; }
 }
