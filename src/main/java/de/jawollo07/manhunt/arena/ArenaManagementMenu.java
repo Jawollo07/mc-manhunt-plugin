@@ -189,7 +189,7 @@ public final class ArenaManagementMenu implements Listener {
                 player.sendMessage("§eHinweis: Die Vorlagenwelt ist aktuell geladen. Vor dem Spielstart muss sie entladen sein.");
             }
             openDetails(player, arena.id());
-        } catch (SQLException | IOException | IllegalArgumentException exception) {
+        } catch (SQLException | IllegalArgumentException exception) {
             player.sendMessage("§cVorlage konnte nicht verwendet werden: " + exception.getMessage());
         }
     }
