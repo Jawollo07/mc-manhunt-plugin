@@ -38,6 +38,8 @@ public final class JuggernautAbilityListener implements Listener {
         Player boss = event.getPlayer();
         Game game = games.getActiveGame().orElse(null);
         if (game == null || !game.isRunning()
+                || game.getPlayer(boss.getUniqueId())
+                .filter(participant -> participant.getStatus() == PlayerStatus.PLAYING).isEmpty()
                 || !game.getRoleManager().getRoleId(boss.getUniqueId()).filter("juggernaut"::equals).isPresent()) return;
 
         Material held = boss.getInventory().getItemInMainHand().getType();
