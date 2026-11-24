@@ -33,6 +33,7 @@ public final class ManHuntCommand implements CommandExecutor, TabCompleter {
         }
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "arena" -> arenaCommand.onCommand(sender, command, label, args);
+            case "arenas" -> openArenaManagement(sender);
             case "game" -> gameCommand.onCommand(sender, command, label, args);
             case "modes" -> listModes(sender);
             case "menu", "lobby" -> openLobbyMenu(sender);
@@ -49,6 +50,14 @@ public final class ManHuntCommand implements CommandExecutor, TabCompleter {
             return;
         }
         plugin.getLobbyMenu().open(player);
+    }
+
+    private void openArenaManagement(CommandSender sender) {
+        if (!(sender instanceof org.bukkit.entity.Player player)) {
+            sender.sendMessage("§cDieses Menü kann nur ingame geöffnet werden.");
+            return;
+        }
+        plugin.getArenaManagementMenu().open(player);
     }
 
     private void openAdminMenu(CommandSender sender) {
@@ -78,6 +87,7 @@ public final class ManHuntCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/" + label + " menu §7(Lobby-Menü)");
         sender.sendMessage("§e/" + label + " admin §7(Admin-Menü)");
         sender.sendMessage("§e/" + label + " arena");
+        sender.sendMessage("§e/" + label + " arenas §7(Arenen und Kartenvorlagen verwalten)");
         sender.sendMessage("§e/" + label + " game");
         sender.sendMessage("§e/" + label + " stats [modus]");
         sender.sendMessage("§e/" + label + " leaderboard [modus]");
@@ -90,7 +100,7 @@ public final class ManHuntCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("arena", "game", "modes", "menu", "lobby", "admin", "stats", "leaderboard"), args[0]);
+            return filter(List.of("arena", "arenas", "game", "modes", "menu", "lobby", "admin", "stats", "leaderboard"), args[0]);
         }
         return switch (args[0].toLowerCase(Locale.ROOT)) {
             case "arena" -> arenaCommand.onTabComplete(sender, command, alias, args);
