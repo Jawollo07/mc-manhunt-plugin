@@ -94,6 +94,41 @@ public final class StorageManager implements AutoCloseable {
                     INSERT OR IGNORE INTO schema_migrations (version, applied_at)
                     VALUES (2, strftime('%s', 'now') * 1000)
                     """);
+
+            // Migration 3: immutable game history and per-participant results.
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS game_history (
+                        game_id TEXT PRIMARY KEY NOT NULL,
+                        mode_id TEXT NOT NULL,
+                        arena_id TEXT NOT NULL,
+                        outcome TEXT NOT NULL,
+                        started_at INTEGER NOT NULL,
+                        ended_at INTEGER NOT NULL,
+                        duration_seconds INTEGER NOT NULL CHECK (duration_seconds >= 0),
+                        end_reason TEXT NOT NULL
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS game_participants (
+                        game_id TEXT NOT NULL,
+                        player_uuid TEXT NOT NULL,
+                        is_winner INTEGER NOT NULL CHECK (is_winner IN (0, 1)),
+                        PRIMARY KEY (game_id, player_uuid),
+                        FOREIGN KEY (game_id) REFERENCES game_history(game_id) ON DELETE CASCADE
+                    )
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_game_history_mode_ended
+                    ON game_history(mode_id, ended_at DESC)
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_game_participants_player
+                    ON game_participants(player_uuid, game_id)
+                    """);
+            statement.execute("""
+                    INSERT OR IGNORE INTO schema_migrations (version, applied_at)
+                    VALUES (3, strftime('%s', 'now') * 1000)
+                    """);
         }
     }
 
