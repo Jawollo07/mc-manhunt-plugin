@@ -4,7 +4,7 @@ database:
 game:
   min-players: 2
   max-players: 8
-  countdown-seconds: 30
+  countdown-seconds: 10
   time-limit-seconds: 2400
   allow-late-join: false
   allow-spectators: true

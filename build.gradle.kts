@@ -29,18 +29,20 @@ tasks.test {
 }
 
 tasks {
-  jar {
-    enabled = false
-  }
+    jar {
+        enabled = false
+    }
 
-  shadowJar {
-    archiveClassifier.set("")
-  }
+    val gitPull by registering(Exec::class) {
+        commandLine("git", "pull")
+    }
 
-  runServer {
-    // Configure the Minecraft version for our task.
-    // This is the only required configuration besides applying the plugin.
-    // Your plugin's jar (or shadowJar if present) will be used automatically.
-    minecraftVersion("26.3")
-  }
+    shadowJar {
+        archiveClassifier.set("")
+    }
+
+    runServer {
+        dependsOn(gitPull)
+        minecraftVersion("26.3")
+    }
 }

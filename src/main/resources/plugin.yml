@@ -3,6 +3,7 @@ version: 0.1.0
 main: de.jawollo07.manhunt.ManHuntPlugin
 description: Modular Manhunt minigame with multiple game modes
 author: Jawollo07
+api-version: 1.21
 commands:
   manhunt:
     description: ManHunt administration and game management
