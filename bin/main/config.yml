@@ -1,0 +1,17 @@
+database:
+  file: data/manhunt.db
+
+game:
+  min-players: 2
+  max-players: 8
+  countdown-seconds: 30
+  time-limit-seconds: 2400
+  allow-late-join: false
+  allow-spectators: true
+
+maps:
+  create-working-copy: true
+  delete-working-copy-after-game: true
+
+general:
+  debug: false

@@ -1,0 +1,13 @@
+{
+  "name": "manhunt",
+  "private": true,
+  "devDependencies": {
+    "@plugdev/cli": "^1.5.0"
+  },
+  "scripts": {
+    "setup": "plugdev setup",
+    "dev": "plugdev run",
+    "dev:server": "plugdev",
+    "dev:watch": "plugdev watch"
+  }
+}
