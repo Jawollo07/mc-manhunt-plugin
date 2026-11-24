@@ -116,7 +116,7 @@ public final class AdminMenu implements Listener {
     }
 
     private void openSettings(Player player, String modeId, String arenaId, int maxPlayers) {
-        int minimum = plugin.getConfigManager().getInt("game.min-players", 2);
+        int minimum = minimumFor(modeId);
         MenuHolder holder = new MenuHolder(Screen.SETTINGS, modeId, arenaId, Math.max(minimum, maxPlayers));
         Inventory inventory = Bukkit.createInventory(holder, 27, Component.text("ManHunt • Spielerlimit"));
         holder.inventory = inventory;
@@ -146,15 +146,17 @@ public final class AdminMenu implements Listener {
                     () -> new IllegalStateException("Der Spielmodus ist nicht mehr verfügbar."));
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
                     () -> new IllegalStateException("Die Arena ist nicht mehr verfügbar."));
+            var mode = factory.createSession();
+            int minimum = Math.max(plugin.getConfigManager().getInt("game.min-players", 2), mode.getMinimumPlayers());
             GameSettings settings = new GameSettings(
-                    plugin.getConfigManager().getInt("game.min-players", 2),
-                    Math.max(plugin.getConfigManager().getInt("game.min-players", 2), maxPlayers),
+                    minimum,
+                    Math.max(minimum, maxPlayers),
                     plugin.getConfigManager().getInt("game.countdown-seconds", 10),
                     plugin.getConfigManager().getInt("game.time-limit-seconds", 2400),
                     plugin.getConfigManager().getBoolean("game.allow-late-join", false),
                     plugin.getConfigManager().getBoolean("game.allow-spectators", true)
             );
-            Game game = plugin.getGameManager().createGame(factory.createSession(), arena, settings);
+            Game game = plugin.getGameManager().createGame(mode, arena, settings);
             plugin.getGameManager().transition(GameState.LOBBY);
             player.closeInventory();
             Bukkit.broadcastMessage("§6[ManHunt] §e" + factory.getDisplayName()
@@ -207,7 +209,7 @@ public final class AdminMenu implements Listener {
                 return;
             }
             if (slot == 11 || slot == 15) {
-                int minimum = plugin.getConfigManager().getInt("game.min-players", 2);
+                int minimum = minimumFor(holder.modeId);
                 int updated = slot == 11 ? Math.max(minimum, holder.maxPlayers - 1)
                         : Math.min(32, holder.maxPlayers + 1);
                 openSettings(player, holder.modeId, holder.arenaId, updated);
@@ -231,6 +233,13 @@ public final class AdminMenu implements Listener {
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
         if (event.getView().getTopInventory().getHolder() instanceof MenuHolder) event.setCancelled(true);
+    }
+
+    private int minimumFor(String modeId) {
+        int configured = plugin.getConfigManager().getInt("game.min-players", 2);
+        return plugin.getGameModeRegistry().get(modeId)
+                .map(factory -> Math.max(configured, factory.createSession().getMinimumPlayers()))
+                .orElse(configured);
     }
 
     private ItemStack item(Material material, String name, String... lore) {
