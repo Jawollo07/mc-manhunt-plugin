@@ -15,6 +15,8 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +36,7 @@ public final class MapManager {
     private final JavaPlugin plugin;
     private final Path worldContainer;
     private final Map<UUID, LoadedMap> instances = new ConcurrentHashMap<>();
+    private final Set<String> editorLoadedTemplates = new HashSet<>();
 
     public MapManager(JavaPlugin plugin) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -181,6 +184,64 @@ public final class MapManager {
         boolean loaded = Bukkit.getWorld(templateId) != null;
         return new MapTemplate(templateId, true, loaded,
                 loaded ? "Welt ist geladen – vor Spielstart entladen" : "Bereit");
+    }
+
+    /**
+     * Loads an original template world for an administrator to edit.
+     * Only worlds loaded by this method are tracked for later editor cleanup;
+     * worlds that were already loaded by the server are never unloaded by us.
+     */
+    public World loadTemplateForEditing(String templateId) throws IOException {
+        requireServerThread();
+        MapTemplate template = inspectTemplate(templateId);
+        if (!template.valid()) {
+            throw new IllegalArgumentException("Invalid map template: " + template.status());
+        }
+        World existing = Bukkit.getWorld(templateId);
+        if (existing != null) return existing;
+
+        World world = Bukkit.createWorld(new WorldCreator(templateId));
+        if (world == null) {
+            throw new IOException("Paper could not load map template: " + templateId);
+        }
+        editorLoadedTemplates.add(templateId.toLowerCase(Locale.ROOT));
+        plugin.getLogger().info("Loaded map template for editing: " + templateId);
+        return world;
+    }
+
+    /**
+     * Unloads a template only if this manager loaded it for editing.
+     * It refuses to unload while any player remains inside the world.
+     *
+     * @return true when the world was unloaded (or was already absent), false
+     * when the world was loaded before an editing session began.
+     */
+    public boolean unloadTemplateAfterEditing(String templateId) {
+        requireServerThread();
+        validateTemplateId(templateId);
+        String key = templateId.toLowerCase(Locale.ROOT);
+        if (!editorLoadedTemplates.contains(key)) return false;
+
+        World world = Bukkit.getWorld(templateId);
+        if (world == null) {
+            editorLoadedTemplates.remove(key);
+            return true;
+        }
+        if (!world.getPlayers().isEmpty()) {
+            throw new IllegalStateException("Players are still inside template world: " + templateId);
+        }
+        world.save();
+        if (!Bukkit.unloadWorld(world, true)) {
+            throw new IllegalStateException("Paper refused to unload template world: " + templateId);
+        }
+        editorLoadedTemplates.remove(key);
+        plugin.getLogger().info("Unloaded edited map template: " + templateId);
+        return true;
+    }
+
+    public boolean isLoadedForEditing(String templateId) {
+        requireServerThread();
+        return templateId != null && editorLoadedTemplates.contains(templateId.toLowerCase(Locale.ROOT));
     }
 
     public int getActiveInstanceCount() {
