@@ -92,6 +92,15 @@ public final class BuiltinGameModes {
                         .collect(java.util.stream.Collectors.joining("§7, §e"));
                 announce("Gewinner: §e" + winnerNames);
             }
+            for (GamePlayer participant : game.getPlayers()) {
+                Player online = Bukkit.getPlayer(participant.getUniqueId());
+                if (online == null || !online.isOnline()) continue;
+                online.playSound(online.getLocation(),
+                        winners.contains(participant.getUniqueId())
+                                ? org.bukkit.Sound.ENTITY_PLAYER_LEVELUP
+                                : org.bukkit.Sound.BLOCK_NOTE_BLOCK_BASS,
+                        0.9f, winners.contains(participant.getUniqueId()) ? 1.2f : 0.8f);
+            }
             // Death-triggered victories must be finalized after Bukkit has completed
             // the death/respawn sequence; restoring a snapshot inside PlayerDeathEvent
             // can otherwise attempt to heal a player before respawn.
