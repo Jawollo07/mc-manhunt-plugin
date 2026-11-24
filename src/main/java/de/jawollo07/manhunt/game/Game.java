@@ -30,6 +30,7 @@ public final class Game {
     private GameResult result;
     private Instant startedAt;
     private Instant endedAt;
+    private int countdownRemainingSeconds = -1;
 
     public Game(UUID id, GameMode mode, Arena arena, GameSettings settings) {
         this.id = Objects.requireNonNull(id, "id");
@@ -49,6 +50,11 @@ public final class Game {
     public GameState getState() { return state; }
     public boolean isRunning() { return state == GameState.RUNNING; }
     public boolean isTerminal() { return state == GameState.RESETTING; }
+    public int getCountdownRemainingSeconds() { return countdownRemainingSeconds; }
+    public void setCountdownRemainingSeconds(int seconds) {
+        if (seconds < -1) throw new IllegalArgumentException("Countdown seconds must be -1 or non-negative");
+        this.countdownRemainingSeconds = seconds;
+    }
 
     public Optional<MapInstance> getMapInstance() {
         return Optional.ofNullable(mapInstance);
