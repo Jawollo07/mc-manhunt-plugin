@@ -35,10 +35,19 @@ public final class ManHuntCommand implements CommandExecutor, TabCompleter {
             case "arena" -> arenaCommand.onCommand(sender, command, label, args);
             case "game" -> gameCommand.onCommand(sender, command, label, args);
             case "modes" -> listModes(sender);
+            case "menu", "lobby" -> openLobbyMenu(sender);
             case "stats", "leaderboard", "top" -> statisticsCommand.onCommand(sender, command, label, args);
             default -> help(sender, label);
         }
         return true;
+    }
+
+    private void openLobbyMenu(CommandSender sender) {
+        if (!(sender instanceof org.bukkit.entity.Player player)) {
+            sender.sendMessage("§cDieses Menü kann nur ingame geöffnet werden.");
+            return;
+        }
+        plugin.getLobbyMenu().open(player);
     }
 
     private void listModes(CommandSender sender) {
@@ -57,6 +66,7 @@ public final class ManHuntCommand implements CommandExecutor, TabCompleter {
     private void help(CommandSender sender, String label) {
         sender.sendMessage("§6ManHunt-Befehle:");
         sender.sendMessage("§e/" + label + " modes");
+        sender.sendMessage("§e/" + label + " menu §7(Lobby-Menü)");
         sender.sendMessage("§e/" + label + " arena");
         sender.sendMessage("§e/" + label + " game");
         sender.sendMessage("§e/" + label + " stats [modus]");
@@ -70,7 +80,7 @@ public final class ManHuntCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("arena", "game", "modes", "stats", "leaderboard"), args[0]);
+            return filter(List.of("arena", "game", "modes", "menu", "lobby", "stats", "leaderboard"), args[0]);
         }
         return switch (args[0].toLowerCase(Locale.ROOT)) {
             case "arena" -> arenaCommand.onTabComplete(sender, command, alias, args);
