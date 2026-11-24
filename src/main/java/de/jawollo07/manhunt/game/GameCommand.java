@@ -49,6 +49,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                 case "join" -> join(sender);
                 case "leave" -> leave(sender);
                 case "start" -> start(sender);
+                case "cancel" -> cancelCountdown(sender);
                 case "status", "lobby" -> status(sender);
                 case "stop" -> stop(sender, args);
                 case "reset" -> reset(sender);
@@ -150,6 +151,17 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         }
 
         beginCountdown(game);
+    }
+
+    private void cancelCountdown(CommandSender sender) {
+        requireAdmin(sender);
+        Game game = requireGame();
+        if (game.getState() != GameState.COUNTDOWN || countdownTask == null) {
+            throw new IllegalStateException("Es läuft aktuell kein Countdown.");
+        }
+        cancelCountdownTask();
+        plugin.getGameManager().transition(GameState.LOBBY);
+        Bukkit.broadcastMessage("§c[ManHunt] Der Start-Countdown wurde vom Administrator abgebrochen.");
     }
 
     private void maybeStartCountdown(Game game) {
@@ -351,6 +363,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/" + label + " game join");
         sender.sendMessage("§e/" + label + " game leave");
         sender.sendMessage("§e/" + label + " game start §7(Admin)");
+        sender.sendMessage("§e/" + label + " game cancel §7(Countdown abbrechen, Admin)");
         sender.sendMessage("§e/" + label + " game status");
         sender.sendMessage("§e/" + label + " game lobby");
         sender.sendMessage("§e/" + label + " game stop [Grund] §7(Admin)");
@@ -431,7 +444,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 2 && args[0].equalsIgnoreCase("game")) {
             List<String> actions = sender.hasPermission("manhunt.admin")
-                    ? List.of("create", "join", "leave", "start", "status", "lobby", "stop", "reset")
+                    ? List.of("create", "join", "leave", "start", "cancel", "status", "lobby", "stop", "reset")
                     : List.of("join", "leave", "status", "lobby");
             return filter(actions, args[1]);
         }
