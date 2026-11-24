@@ -3,7 +3,9 @@ package de.jawollo07.manhunt.game;
 import de.jawollo07.manhunt.ManHuntPlugin;
 import de.jawollo07.manhunt.arena.Arena;
 import de.jawollo07.manhunt.modes.GameModeFactory;
-import net.kyori.adventure.bossbar.BossBar;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
@@ -387,9 +389,9 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         String title = "§6" + game.getMode().getDisplayName() + " §8• §f" + elapsedText
                 + (remaining >= 0 ? " §8| §e" + formatTime(remaining) : "");
         if (gameBossBar == null) {
-            gameBossBar = Bukkit.createBossBar(title, BossBar.Color.GREEN, BossBar.Overlay.PROGRESS);
+            gameBossBar = Bukkit.createBossBar(title, BarColor.GREEN, BarStyle.SOLID);
         }
-        gameBossBar.setName(title);
+        gameBossBar.setTitle(title);
         gameBossBar.setProgress(limit > 0 ? Math.max(0.0, Math.min(1.0, (double) remaining / limit)) : 1.0);
         String actionBar = "§e" + game.getMode().getDisplayName() + " §8• §f" + elapsedText
                 + (remaining >= 0 ? " §8• §cNoch " + formatTime(remaining) : "");
