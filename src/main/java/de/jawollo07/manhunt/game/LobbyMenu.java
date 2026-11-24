@@ -28,6 +28,15 @@ public final class LobbyMenu implements Listener {
 
     public LobbyMenu(ManHuntPlugin plugin) {
         this.plugin = plugin;
+        Bukkit.getScheduler().runTaskTimer(plugin, this::refreshOpenMenus, 40L, 40L);
+    }
+
+    private void refreshOpenMenus() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getOpenInventory().getTopInventory().getHolder() instanceof MenuHolder) {
+                render(player, player.getOpenInventory().getTopInventory());
+            }
+        }
     }
 
     public void open(Player player) {
