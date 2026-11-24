@@ -110,14 +110,19 @@ public final class AdminMenu implements Listener {
             for (Arena arena : arenas) {
                 if (slot > LAST_SLOT) break;
                 holder.entries.put(slot, arena.id());
-                inventory.setItem(slot++, item(Material.MAP, "§a" + arena.displayName(),
+                var template = plugin.getMapManager().inspectTemplate(arena.worldName());
+                Material icon = !template.valid() ? Material.BARRIER
+                        : template.loaded() ? Material.YELLOW_CONCRETE : Material.MAP;
+                inventory.setItem(slot++, item(icon, "§a" + arena.displayName(),
                         "§7Arena-ID: §f" + arena.id(),
                         "§7Vorlage: §f" + arena.worldName(),
+                        "§7Status: " + (template.valid() ? (template.loaded() ? "§e" : "§a") : "§c") + template.status(),
+                        "§7Spawnpunkte: §f" + arena.spawnPoints().size(),
                         "§aKlicken, um die Runde zu erstellen"));
             }
             if (arenas.isEmpty()) inventory.setItem(22, item(Material.BARRIER, "§cKeine Arenen vorhanden",
                     "§7Lege zuerst eine Arena mit /manhunt arena create an."));
-        } catch (SQLException exception) {
+        } catch (SQLException | IllegalArgumentException exception) {
             plugin.getLogger().severe("Could not load arenas for admin menu: " + exception.getMessage());
             inventory.setItem(22, item(Material.BARRIER, "§cArenen konnten nicht geladen werden"));
         }
