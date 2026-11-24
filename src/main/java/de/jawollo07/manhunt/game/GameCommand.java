@@ -22,6 +22,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     private final ManHuntPlugin plugin;
     private BukkitTask countdownTask;
     private BukkitTask gameTickTask;
+    private int countdownRemaining = -1;
 
     public GameCommand(ManHuntPlugin plugin) {
         this.plugin = plugin;
@@ -41,7 +42,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                 case "join" -> join(sender);
                 case "leave" -> leave(sender);
                 case "start" -> start(sender);
-                case "status" -> status(sender);
+                case "status", "lobby" -> status(sender);
                 case "stop" -> stop(sender, args);
                 case "reset" -> reset(sender);
                 default -> help(sender, label);
@@ -86,30 +87,44 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     private void join(CommandSender sender) {
         Player player = requirePlayer(sender);
         Game game = requireGame();
-        if (game.getState() != GameState.WAITING && game.getState() != GameState.LOBBY) {
+        if (game.getState() != GameState.WAITING && game.getState() != GameState.LOBBY
+                && game.getState() != GameState.COUNTDOWN) {
             throw new IllegalStateException("Der Beitritt ist in diesem Spielstatus nicht möglich.");
         }
         if (game.hasPlayer(player.getUniqueId())) {
             throw new IllegalStateException("Du bist bereits Teil dieser Runde.");
         }
-        plugin.getGameManager().addPlayer(player.getUniqueId());
-        game.getMode().onPlayerJoin(game, game.getPlayer(player.getUniqueId()).orElseThrow());
-        Bukkit.broadcastMessage("§a" + player.getName() + " §7ist der Runde beigetreten. §8("
-                + game.getPlayerCount() + "/" + game.getSettings().maxPlayers() + ")");
+        GamePlayer participant = plugin.getGameManager().addPlayer(player.getUniqueId());
+        try {
+            game.getMode().onPlayerJoin(game, participant);
+        } catch (RuntimeException exception) {
+            plugin.getGameManager().removePlayer(player.getUniqueId());
+            throw exception;
+        }
+        Bukkit.broadcastMessage("§a" + player.getName() + " §7ist der Runde beigetreten.");
+        broadcastLobbyStatus(game);
+        maybeStartCountdown(game);
     }
 
     private void leave(CommandSender sender) {
         Player player = requirePlayer(sender);
         Game game = requireGame();
-        if (game.getState() != GameState.WAITING && game.getState() != GameState.LOBBY) {
+        if (game.getState() != GameState.WAITING && game.getState() != GameState.LOBBY
+                && game.getState() != GameState.COUNTDOWN) {
             throw new IllegalStateException("Während einer laufenden Runde kannst du nicht austreten.");
         }
         GamePlayer participant = game.getPlayer(player.getUniqueId()).orElseThrow(
                 () -> new IllegalArgumentException("Du bist nicht Teil dieser Runde."));
         game.getMode().onPlayerQuit(game, participant);
         plugin.getGameManager().removePlayer(player.getUniqueId());
-        Bukkit.broadcastMessage("§e" + player.getName() + " §7hat die Runde verlassen. §8("
-                + game.getPlayerCount() + "/" + game.getSettings().maxPlayers() + ")");
+        Bukkit.broadcastMessage("§e" + player.getName() + " §7hat die Runde verlassen.");
+        if (game.getState() == GameState.COUNTDOWN
+                && game.getPlayerCount() < game.getSettings().minPlayers()) {
+            cancelCountdownTask();
+            plugin.getGameManager().transition(GameState.LOBBY);
+            Bukkit.broadcastMessage("§c[ManHunt] Zu wenige Spieler – der Countdown wurde pausiert.");
+        }
+        broadcastLobbyStatus(game);
     }
 
     private void start(CommandSender sender) {
@@ -124,34 +139,78 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                     + game.getSettings().minPlayers() + ", vorhanden sind " + game.getPlayerCount() + ".");
         }
 
-        plugin.getGameManager().transition(GameState.COUNTDOWN);
-        int seconds = game.getSettings().countdownSeconds();
-        if (seconds <= 0) {
+        beginCountdown(game);
+    }
+
+    private void maybeStartCountdown(Game game) {
+        if (countdownTask != null || game.getState() == GameState.COUNTDOWN) return;
+        if ((game.getState() == GameState.WAITING || game.getState() == GameState.LOBBY)
+                && game.getPlayerCount() >= game.getSettings().minPlayers()) {
+            beginCountdown(game);
+        }
+    }
+
+    private void beginCountdown(Game game) {
+        if (countdownTask != null) return;
+        if (game.getPlayerCount() < game.getSettings().minPlayers()) {
+            throw new IllegalStateException("Es fehlen noch "
+                    + (game.getSettings().minPlayers() - game.getPlayerCount()) + " Spieler.");
+        }
+        if (game.getState() != GameState.COUNTDOWN) {
+            plugin.getGameManager().transition(GameState.COUNTDOWN);
+        }
+        countdownRemaining = game.getSettings().countdownSeconds();
+        Bukkit.broadcastMessage("§6[ManHunt] §eGenügend Spieler! Die Runde startet in "
+                + countdownRemaining + " Sekunden.");
+        if (countdownRemaining <= 0) {
+            countdownRemaining = -1;
             launch(game);
             return;
         }
-        final int[] remaining = {seconds};
-        Bukkit.broadcastMessage("§6[ManHunt] §eDie Runde startet in " + seconds + " Sekunden!");
         countdownTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             Game current = plugin.getGameManager().getActiveGame().orElse(null);
             if (current != game || game.getState() != GameState.COUNTDOWN) {
-                cancelCountdown();
+                cancelCountdownTask();
                 return;
             }
             if (game.getPlayerCount() < game.getSettings().minPlayers()) {
-                cancelCountdown();
+                cancelCountdownTask();
                 plugin.getGameManager().transition(GameState.LOBBY);
-                Bukkit.broadcastMessage("§c[ManHunt] Countdown abgebrochen: Nicht genügend Spieler.");
+                Bukkit.broadcastMessage("§c[ManHunt] Zu wenige Spieler – Countdown pausiert.");
+                broadcastLobbyStatus(game);
                 return;
             }
-            remaining[0]--;
-            if (remaining[0] <= 0) {
-                cancelCountdown();
+            countdownRemaining--;
+            if (countdownRemaining <= 0) {
+                cancelCountdownTask();
                 launch(game);
-            } else if (remaining[0] <= 5 || remaining[0] % 5 == 0) {
-                Bukkit.broadcastMessage("§6[ManHunt] §eStart in " + remaining[0] + "...");
+            } else if (countdownRemaining <= 5 || countdownRemaining % 5 == 0) {
+                Bukkit.broadcastMessage("§6[ManHunt] §eStart in " + countdownRemaining + "...");
             }
         }, 20L, 20L);
+    }
+
+    private void cancelCountdownTask() {
+        if (countdownTask != null) {
+            countdownTask.cancel();
+            countdownTask = null;
+        }
+        countdownRemaining = -1;
+    }
+
+    private void broadcastLobbyStatus(Game game) {
+        Bukkit.broadcastMessage("§6[ManHunt-Lobby] §7Spieler: §e" + game.getPlayerCount()
+                + "/" + game.getSettings().maxPlayers() + " §8| §7Benötigt: §e"
+                + game.getSettings().minPlayers());
+        String names = game.getPlayers().stream()
+                .map(participant -> {
+                    Player online = Bukkit.getPlayer(participant.getUniqueId());
+                    if (online != null) return online.getName();
+                    String name = Bukkit.getOfflinePlayer(participant.getUniqueId()).getName();
+                    return name == null ? participant.getUniqueId().toString().substring(0, 8) : name;
+                })
+                .collect(java.util.stream.Collectors.joining("§7, §f"));
+        Bukkit.broadcastMessage("§7Dabei: " + (names.isEmpty() ? "§8Noch niemand" : "§f" + names));
     }
 
     private void launch(Game game) {
@@ -224,7 +283,21 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§7Modus: §e" + game.getMode().getDisplayName());
         sender.sendMessage("§7Arena: §e" + game.getArena().displayName());
         sender.sendMessage("§7Status: §e" + game.getState());
-        sender.sendMessage("§7Spieler: §e" + game.getPlayerCount() + "/" + game.getSettings().maxPlayers());
+        sender.sendMessage("§7Spieler: §e" + game.getPlayerCount() + "/" + game.getSettings().maxPlayers()
+                + " §8| §7Minimum: §e" + game.getSettings().minPlayers());
+        String names = game.getPlayers().stream().map(participant -> {
+            Player online = Bukkit.getPlayer(participant.getUniqueId());
+            if (online != null) return online.getName();
+            String name = Bukkit.getOfflinePlayer(participant.getUniqueId()).getName();
+            return name == null ? participant.getUniqueId().toString().substring(0, 8) : name;
+        }).collect(java.util.stream.Collectors.joining("§7, §f"));
+        sender.sendMessage("§7Teilnehmer: " + (names.isEmpty() ? "§8Noch niemand" : "§f" + names));
+        if (game.getState() == GameState.LOBBY || game.getState() == GameState.WAITING) {
+            sender.sendMessage("§7Lobby: §e/manhunt game join §8| §e/manhunt game leave");
+        }
+        if (game.getState() == GameState.COUNTDOWN && countdownRemaining >= 0) {
+            sender.sendMessage("§7Start in: §e" + countdownRemaining + " Sekunden");
+        }
         game.getDuration().ifPresent(duration ->
                 sender.sendMessage("§7Dauer: §e" + duration.toSeconds() + " Sekunden"));
     }
@@ -262,6 +335,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/" + label + " game leave");
         sender.sendMessage("§e/" + label + " game start §7(Admin)");
         sender.sendMessage("§e/" + label + " game status");
+        sender.sendMessage("§e/" + label + " game lobby");
         sender.sendMessage("§e/" + label + " game stop [Grund] §7(Admin)");
         sender.sendMessage("§e/" + label + " game reset §7(Admin)");
         sender.sendMessage("§e/" + label + " modes");
@@ -294,10 +368,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     }
 
     public void cancelCountdown() {
-        if (countdownTask != null) {
-            countdownTask.cancel();
-            countdownTask = null;
-        }
+        cancelCountdownTask();
         cancelGameTicker();
     }
 
@@ -305,8 +376,8 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 2 && args[0].equalsIgnoreCase("game")) {
             List<String> actions = sender.hasPermission("manhunt.admin")
-                    ? List.of("create", "join", "leave", "start", "status", "stop", "reset")
-                    : List.of("join", "leave", "status");
+                    ? List.of("create", "join", "leave", "start", "status", "lobby", "stop", "reset")
+                    : List.of("join", "leave", "status", "lobby");
             return filter(actions, args[1]);
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("create")
