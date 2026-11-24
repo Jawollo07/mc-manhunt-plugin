@@ -197,8 +197,8 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
                 () -> new IllegalArgumentException("Arena nicht gefunden: " + args[2]));
         var template = plugin.getMapManager().inspectTemplate(args[3]);
         if (!template.valid()) throw new IllegalArgumentException("Ungültige Kartenvorlage: " + template.status());
-        plugin.getArenaService().save(new Arena(arena.id(), arena.displayName(), args[3], arena.spawnPoints()));
-        sender.sendMessage("§aKartenvorlage auf §e" + args[3] + " §agesetzt.");
+        plugin.getArenaService().save(new Arena(arena.id(), arena.displayName(), args[3]));
+        sender.sendMessage("§aKartenvorlage auf §e" + args[3] + " §agesetzt. Alte Spawnpunkte wurden zurückgesetzt.");
         if (template.loaded()) sender.sendMessage("§eHinweis: Welt muss vor Spielstart entladen werden.");
     }
 
