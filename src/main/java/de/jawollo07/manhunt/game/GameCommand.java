@@ -2,6 +2,7 @@ package de.jawollo07.manhunt.game;
 
 import de.jawollo07.manhunt.ManHuntPlugin;
 import de.jawollo07.manhunt.arena.Arena;
+import de.jawollo07.manhunt.modes.GameMode;
 import de.jawollo07.manhunt.modes.GameModeFactory;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
@@ -74,15 +75,18 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         Arena arena = plugin.getArenaService().find(args[3]).orElseThrow(
                 () -> new IllegalArgumentException("Arena nicht gefunden: " + args[3]));
 
+        GameMode mode = factory.createSession();
+        int minimumPlayers = Math.max(plugin.getConfigManager().getInt("game.min-players", 2),
+                mode.getMinimumPlayers());
         GameSettings settings = new GameSettings(
-                plugin.getConfigManager().getInt("game.min-players", 2),
-                plugin.getConfigManager().getInt("game.max-players", 8),
+                minimumPlayers,
+                Math.max(minimumPlayers, plugin.getConfigManager().getInt("game.max-players", 8)),
                 plugin.getConfigManager().getInt("game.countdown-seconds", 10),
                 plugin.getConfigManager().getInt("game.time-limit-seconds", 1800),
                 plugin.getConfigManager().getBoolean("game.allow-late-join", false),
                 plugin.getConfigManager().getBoolean("game.allow-spectators", true)
         );
-        Game game = plugin.getGameManager().createGame(factory.createSession(), arena, settings);
+        Game game = plugin.getGameManager().createGame(mode, arena, settings);
         plugin.getGameManager().transition(GameState.LOBBY);
         Bukkit.broadcastMessage("§6[ManHunt] §e" + factory.getDisplayName()
                 + " §7auf Arena §e" + arena.displayName() + " §7wurde erstellt.");
