@@ -158,6 +158,9 @@ public final class MapManager {
                     .filter(path -> !Files.isSymbolicLink(path))
                     .filter(path -> !path.getFileName().toString().startsWith("manhunt_"))
                     .filter(path -> !path.getFileName().toString().startsWith("."))
+                    // Only real Minecraft worlds belong in the template picker;
+                    // server folders such as config, libraries, logs, etc. have no level.dat.
+                    .filter(path -> Files.isRegularFile(path.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS))
                     .sorted(java.util.Comparator.comparing(path -> path.getFileName().toString().toLowerCase(Locale.ROOT)))
                     .toList()) {
                 String id = folder.getFileName().toString();
