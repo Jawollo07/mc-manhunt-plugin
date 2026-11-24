@@ -237,14 +237,32 @@ public final class ArenaManagementMenu implements Listener {
                 return;
             }
             World world = plugin.getMapManager().loadTemplateForEditing(templateId);
+            UUID playerId = player.getUniqueId();
             if (!player.getWorld().equals(world)) {
-                editingReturnLocations.putIfAbsent(player.getUniqueId(), player.getLocation().clone());
+                editingReturnLocations.putIfAbsent(playerId, player.getLocation().clone());
                 if (!player.teleport(world.getSpawnLocation())) {
+                    editingReturnLocations.remove(playerId);
+                    try {
+                        plugin.getMapManager().unloadTemplateAfterEditing(templateId);
+                    } catch (IllegalStateException ignored) {
+                        // Another editor may already be inside this template.
+                    }
                     player.sendMessage("§cTeleport in die Vorlagenwelt fehlgeschlagen.");
                     return;
                 }
+            } else if (!editingReturnLocations.containsKey(playerId)) {
+                World fallbackWorld = Bukkit.getWorlds().stream()
+                        .filter(candidate -> !candidate.equals(world))
+                        .findFirst().orElse(null);
+                if (fallbackWorld == null) {
+                    player.sendMessage("§cEs gibt keine andere geladene Welt als Rückkehrziel.");
+                    return;
+                }
+                editingReturnLocations.put(playerId, fallbackWorld.getSpawnLocation());
+                player.sendMessage("§eDu warst bereits in der Vorlagenwelt. Als Rückkehrziel wird der Spawn von §f"
+                        + fallbackWorld.getName() + " §everwendet.");
             }
-            editingTemplateIds.put(player.getUniqueId(), templateId);
+            editingTemplateIds.put(playerId, templateId);
             player.closeInventory();
             player.sendMessage("§aDu bearbeitest jetzt die Originalvorlage §e" + templateId + "§a.");
             player.sendMessage("§7Nutze §e/manhunt arenas §7für Spawnpunkte. Mit §eVorlage verlassen §7kehrst du zurück.");
