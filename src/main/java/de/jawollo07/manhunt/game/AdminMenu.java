@@ -193,7 +193,11 @@ public final class AdminMenu implements Listener {
             player.closeInventory();
             return;
         }
-        if ((holder.screen == Screen.OVERVIEW && slot == 24)\n                || (holder.screen == Screen.MODES && slot == 45)) {\n            plugin.getArenaManagementMenu().open(player);\n            return;\n        }\n        if (holder.screen == Screen.OVERVIEW && slot == 22) {
+        if ((holder.screen == Screen.OVERVIEW && slot == 24)
+                || (holder.screen == Screen.MODES && slot == 45)) {
+            plugin.getArenaManagementMenu().open(player);
+            return;
+        }\n        if (holder.screen == Screen.OVERVIEW && slot == 22) {
             Game active = plugin.getGameManager().getActiveGame().orElse(null);
             if (active == null) {
                 openModes(player);
