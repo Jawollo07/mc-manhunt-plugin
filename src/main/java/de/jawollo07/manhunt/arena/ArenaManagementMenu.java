@@ -3,6 +3,8 @@ package de.jawollo07.manhunt.arena;
 import de.jawollo07.manhunt.ManHuntPlugin;
 import de.jawollo07.manhunt.game.Game;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import io.papermc.paper.event.player.AsyncChatEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -21,11 +23,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** In-game arena and template administration. All actions are permission checked and non-destructive to templates. */
 public final class ArenaManagementMenu implements Listener {
     private static final int SIZE = 54;
     private final ManHuntPlugin plugin;
+    private final Map<UUID, PendingInput> pendingInputs = new ConcurrentHashMap<>();
 
     public ArenaManagementMenu(ManHuntPlugin plugin) {
         this.plugin = plugin;
@@ -143,6 +148,11 @@ public final class ArenaManagementMenu implements Listener {
                         "§eRechtsklick: Position in Vorlagenwelt testen"));
             }
             inventory.setItem(45, item(Material.ARROW, "§eZurück"));
+            inventory.setItem(47, item(Material.NAME_TAG, "§eAnzeigename ändern",
+                    "§7Neuen Namen im Chat eingeben."));
+            inventory.setItem(48, item(Material.FILLED_MAP, "§eKartenvorlage wechseln",
+                    "§7Neue Vorlagen-ID im Chat eingeben.",
+                    "§cSpawnpunkte werden dabei zurückgesetzt."));
             inventory.setItem(49, item(Material.TNT, "§cArena löschen",
                     "§7Entfernt nur den Arena-Eintrag,",
                     "§7niemals den Vorlagen-Weltordner."));
@@ -262,6 +272,15 @@ public final class ArenaManagementMenu implements Listener {
             if (id != null) createFromTemplate(player, id);
         } else if (holder.screen == Screen.DETAILS) {
             if (slot == 45) { openArenaList(player); return; }
+            if (slot == 47 || slot == 48) {
+                pendingInputs.put(player.getUniqueId(), new PendingInput(holder.arenaId,
+                        slot == 47 ? InputAction.RENAME : InputAction.CHANGE_TEMPLATE));
+                player.closeInventory();
+                player.sendMessage(slot == 47
+                        ? "§eGib den neuen Anzeigenamen im Chat ein. Mit "-" abbrechen."
+                        : "§eGib die ID der neuen Kartenvorlage im Chat ein. Mit "-" abbrechen.");
+                return;
+            }
             if (slot == 49) { openConfirm(player, holder.arenaId, null); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String spawnName = holder.spawnActions.get(slot);
@@ -287,6 +306,46 @@ public final class ArenaManagementMenu implements Listener {
                 if (holder.secondaryId == null) openDetails(player, holder.arenaId);
                 else openDetails(player, holder.arenaId);
             }
+        }
+    }
+
+    @EventHandler
+    public void onChat(AsyncChatEvent event) {
+        PendingInput pending = pendingInputs.remove(event.getPlayer().getUniqueId());
+        if (pending == null) return;
+        event.setCancelled(true);
+        String value = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
+        Bukkit.getScheduler().runTask(plugin, () -> applyInput(event.getPlayer(), pending, value));
+    }
+
+    private void applyInput(Player player, PendingInput pending, String value) {
+        if (value.equals("-")) {
+            player.sendMessage("§7Änderung abgebrochen.");
+            openDetails(player, pending.arenaId());
+            return;
+        }
+        if (value.isBlank() || value.length() > 48) {
+            player.sendMessage("§cDer Wert muss zwischen 1 und 48 Zeichen lang sein.");
+            openDetails(player, pending.arenaId());
+            return;
+        }
+        try {
+            Arena arena = plugin.getArenaService().find(pending.arenaId()).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            if (pending.action() == InputAction.RENAME) {
+                plugin.getArenaService().save(new Arena(arena.id(), value, arena.worldName(), arena.spawnPoints()));
+                player.sendMessage("§aAnzeigename wurde geändert.");
+            } else {
+                var template = plugin.getMapManager().inspectTemplate(value);
+                if (!template.valid()) throw new IllegalArgumentException("Keine gültige Vorlage: " + template.status());
+                plugin.getArenaService().save(new Arena(arena.id(), arena.displayName(), value));
+                player.sendMessage("§aKartenvorlage geändert. §eAlle bisherigen Spawnpunkte wurden zurückgesetzt, da sie zur alten Karte gehörten.");
+                if (template.loaded()) player.sendMessage("§eDie neue Vorlagenwelt muss vor Spielstart entladen werden.");
+            }
+            openDetails(player, pending.arenaId());
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cÄnderung fehlgeschlagen: " + exception.getMessage());
+            openDetails(player, pending.arenaId());
         }
     }
 
@@ -327,6 +386,8 @@ public final class ArenaManagementMenu implements Listener {
     }
 
     private enum Screen { ARENAS, TEMPLATES, DETAILS, CONFIRM }
+    private enum InputAction { RENAME, CHANGE_TEMPLATE }
+    private record PendingInput(String arenaId, InputAction action) { }
 
     private static final class MenuHolder implements InventoryHolder {
         private final Screen screen;
