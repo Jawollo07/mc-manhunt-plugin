@@ -40,6 +40,20 @@ class GameManagerTest {
     }
 
     @Test
+    void allowsPlayersToJoinDuringCountdown() {
+        GameManager manager = new GameManager();
+        Game game = manager.createGame(mode, arena, settings);
+        manager.addPlayer(UUID.randomUUID());
+        manager.transition(GameState.LOBBY);
+        manager.transition(GameState.COUNTDOWN);
+
+        UUID lateJoiner = UUID.randomUUID();
+        assertDoesNotThrow(() -> manager.addPlayer(lateJoiner));
+        assertTrue(game.hasPlayer(lateJoiner));
+        assertEquals(2, game.getPlayerCount());
+    }
+
+    @Test
     void completesGameLifecycle() {
         GameManager manager = new GameManager();
         Game game = manager.createGame(mode, arena, settings);
