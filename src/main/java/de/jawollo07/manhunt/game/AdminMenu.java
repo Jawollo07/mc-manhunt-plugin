@@ -94,6 +94,7 @@ public final class AdminMenu implements Listener {
                     "§7ID: §f" + mode.getId(), "§aKlicken, um diesen Modus auszuwählen"));
         }
         if (modes.isEmpty()) inventory.setItem(22, item(Material.BARRIER, "§cKeine Spielmodi registriert"));
+        inventory.setItem(45, item(Material.MAP, "§aArenen verwalten", "§7Kartenvorlagen und Spawnpunkte"));
         inventory.setItem(49, item(Material.BARRIER, "§cSchließen"));
         player.openInventory(inventory);
     }
@@ -197,7 +198,8 @@ public final class AdminMenu implements Listener {
                 || (holder.screen == Screen.MODES && slot == 45)) {
             plugin.getArenaManagementMenu().open(player);
             return;
-        }\n        if (holder.screen == Screen.OVERVIEW && slot == 22) {
+        }
+        if (holder.screen == Screen.OVERVIEW && slot == 22) {
             Game active = plugin.getGameManager().getActiveGame().orElse(null);
             if (active == null) {
                 openModes(player);
