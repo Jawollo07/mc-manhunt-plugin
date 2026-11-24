@@ -37,7 +37,39 @@ public final class AdminMenu implements Listener {
             player.sendMessage("§cDafür hast du keine Berechtigung.");
             return;
         }
-        openModes(player);
+        if (plugin.getGameManager().getActiveGame().isPresent()) openOverview(player);
+        else openModes(player);
+    }
+
+    private void openOverview(Player player) {
+        Game game = plugin.getGameManager().getActiveGame().orElse(null);
+        if (game == null) {
+            openModes(player);
+            return;
+        }
+        MenuHolder holder = new MenuHolder(Screen.OVERVIEW, null);
+        Inventory inventory = Bukkit.createInventory(holder, 27, Component.text("ManHunt • Rundenverwaltung"));
+        holder.inventory = inventory;
+        inventory.setItem(4, item(Material.COMPASS, "§e" + game.getMode().getDisplayName(),
+                "§7Arena: §f" + game.getArena().displayName(),
+                "§7Status: §f" + game.getState(),
+                "§7Spieler: §f" + game.getPlayerCount() + "/" + game.getSettings().maxPlayers()));
+        int slot = 9;
+        for (GamePlayer participant : game.getPlayers()) {
+            if (slot > 17) break;
+            String name = Bukkit.getOfflinePlayer(participant.getUniqueId()).getName();
+            inventory.setItem(slot++, item(Material.PLAYER_HEAD, "§a" + (name == null ? participant.getUniqueId().toString().substring(0, 8) : name),
+                    "§7Status: §f" + participant.getStatus()));
+        }
+        if (game.getState() == GameState.ENDING || game.getState() == GameState.RESETTING) {
+            inventory.setItem(20, item(Material.CLOCK, "§eReset / Aufräumen",
+                    "§7Stellt Spieler wieder her und entfernt die temporäre Map."));
+        } else {
+            inventory.setItem(20, item(Material.REDSTONE_BLOCK, "§cRunde stoppen",
+                    "§7Beendet die aktuelle Runde und stellt Spieler wieder her."));
+        }
+        inventory.setItem(22, item(Material.BARRIER, "§cSchließen"));
+        player.openInventory(inventory);
     }
 
     private void openModes(Player player) {
@@ -129,8 +161,22 @@ public final class AdminMenu implements Listener {
             return;
         }
         int slot = event.getRawSlot();
-        if (slot == 49) {
+        if (slot == 49 || (holder.screen == Screen.OVERVIEW && slot == 22)) {
             player.closeInventory();
+            return;
+        }
+        if (holder.screen == Screen.OVERVIEW && slot == 20) {
+            player.closeInventory();
+            Game active = plugin.getGameManager().getActiveGame().orElse(null);
+            if (active == null) {
+                openModes(player);
+            } else if (active.getState() == GameState.ENDING || active.getState() == GameState.RESETTING) {
+                Bukkit.dispatchCommand(player, "manhunt game reset");
+                open(player);
+            } else {
+                Bukkit.dispatchCommand(player, "manhunt game stop Admin-Steuerung");
+                open(player);
+            }
             return;
         }
         if (holder.screen == Screen.ARENAS && slot == 45) {
@@ -162,7 +208,7 @@ public final class AdminMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { MODES, ARENAS }
+    private enum Screen { OVERVIEW, MODES, ARENAS }
 
     private static final class MenuHolder implements InventoryHolder {
         private final Screen screen;
