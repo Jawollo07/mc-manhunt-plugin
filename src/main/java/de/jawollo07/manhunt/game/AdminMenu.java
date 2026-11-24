@@ -65,7 +65,8 @@ public final class AdminMenu implements Listener {
             inventory.setItem(20, item(Material.CLOCK, "§eReset / Aufräumen",
                     "§7Stellt Spieler wieder her und entfernt die temporäre Map."));
         } else {
-            inventory.setItem(20, item(Material.REDSTONE_BLOCK, "§cRunde stoppen",
+            inventory.setItem(24, item(Material.MAP, "§aArenen verwalten", "§7Arenen, Vorlagen und Spawnpunkte bearbeiten."));
+        inventory.setItem(20, item(Material.REDSTONE_BLOCK, "§cRunde stoppen",
                     "§7Beendet die aktuelle Runde und stellt Spieler wieder her."));
         }
         if (game.getState() == GameState.COUNTDOWN) {
@@ -192,7 +193,7 @@ public final class AdminMenu implements Listener {
             player.closeInventory();
             return;
         }
-        if (holder.screen == Screen.OVERVIEW && slot == 22) {
+        if ((holder.screen == Screen.OVERVIEW && slot == 24)\n                || (holder.screen == Screen.MODES && slot == 45)) {\n            plugin.getArenaManagementMenu().open(player);\n            return;\n        }\n        if (holder.screen == Screen.OVERVIEW && slot == 22) {
             Game active = plugin.getGameManager().getActiveGame().orElse(null);
             if (active == null) {
                 openModes(player);
