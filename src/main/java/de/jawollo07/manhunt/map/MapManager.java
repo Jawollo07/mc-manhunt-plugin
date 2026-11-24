@@ -142,6 +142,47 @@ public final class MapManager {
         if (failure != null) throw failure;
     }
 
+    /**
+     * Lists world folders in the server world container as candidate templates.
+     * ManHunt working copies are intentionally excluded.
+     */
+    public java.util.List<MapTemplate> listTemplates() throws IOException {
+        requireServerThread();
+        java.util.List<MapTemplate> templates = new java.util.ArrayList<>();
+        if (!Files.isDirectory(worldContainer, LinkOption.NOFOLLOW_LINKS)) return java.util.List.of();
+        try (var entries = Files.list(worldContainer)) {
+            for (Path folder : entries.filter(path -> Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
+                    .filter(path -> !Files.isSymbolicLink(path))
+                    .filter(path -> !path.getFileName().toString().startsWith("manhunt_"))
+                    .filter(path -> !path.getFileName().toString().startsWith("."))
+                    .sorted(java.util.Comparator.comparing(path -> path.getFileName().toString().toLowerCase(Locale.ROOT)))
+                    .toList()) {
+                String id = folder.getFileName().toString();
+                if (!TEMPLATE_ID.matcher(id).matches()) continue;
+                templates.add(inspectTemplate(id));
+            }
+        }
+        return java.util.List.copyOf(templates);
+    }
+
+    /** Inspects a candidate without loading it or modifying any files. */
+    public MapTemplate inspectTemplate(String templateId) {
+        requireServerThread();
+        validateTemplateId(templateId);
+        Path folder = worldContainer.resolve(templateId).normalize();
+        if (!folder.getParent().equals(worldContainer) || Files.isSymbolicLink(folder)
+                || !Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS)) {
+            return new MapTemplate(templateId, false, false, "Ordner fehlt oder ist kein sicherer Weltordner");
+        }
+        if (!Files.isRegularFile(folder.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS)) {
+            return new MapTemplate(templateId, false, Bukkit.getWorld(templateId) != null,
+                    "level.dat fehlt – keine gültige Minecraft-Welt");
+        }
+        boolean loaded = Bukkit.getWorld(templateId) != null;
+        return new MapTemplate(templateId, true, loaded,
+                loaded ? "Welt ist geladen – vor Spielstart entladen" : "Bereit");
+    }
+
     public int getActiveInstanceCount() {
         return instances.size();
     }
