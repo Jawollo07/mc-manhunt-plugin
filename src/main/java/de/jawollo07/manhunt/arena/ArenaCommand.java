@@ -46,9 +46,9 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
                 case "delspawn" -> deleteSpawn(sender, args);
                 default -> sendHelp(sender, label);
             }
-        } catch (SQLException exception) {
-            plugin.getLogger().severe("Arena database operation failed: " + exception.getMessage());
-            sender.sendMessage("§cDie Arena-Datenbankoperation ist fehlgeschlagen.");
+        } catch (SQLException | java.io.IOException exception) {
+            plugin.getLogger().severe("Arena operation failed: " + exception.getMessage());
+            sender.sendMessage("§cDie Arena-Verwaltung ist fehlgeschlagen: " + exception.getMessage());
         } catch (IllegalArgumentException | IllegalStateException exception) {
             sender.sendMessage("§c" + exception.getMessage());
         }
