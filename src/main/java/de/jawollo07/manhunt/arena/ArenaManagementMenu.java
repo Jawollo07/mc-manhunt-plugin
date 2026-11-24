@@ -7,6 +7,8 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -31,6 +33,7 @@ public final class ArenaManagementMenu implements Listener {
     private static final int SIZE = 54;
     private final ManHuntPlugin plugin;
     private final Map<UUID, PendingInput> pendingInputs = new ConcurrentHashMap<>();
+    private final Map<UUID, Location> editingReturnLocations = new ConcurrentHashMap<>();
 
     public ArenaManagementMenu(ManHuntPlugin plugin) {
         this.plugin = plugin;
@@ -71,6 +74,10 @@ public final class ArenaManagementMenu implements Listener {
         }
         inventory.setItem(45, item(Material.MAP, "§aKartenvorlagen",
                 "§7Vorhandene Minecraft-Welten durchsuchen"));
+        if (editingReturnLocations.containsKey(player.getUniqueId())) {
+            inventory.setItem(47, item(Material.OAK_DOOR, "§eVorlage verlassen",
+                    "§7Zurück zum vorherigen Standort", "§7und die Vorlage sicher entladen."));
+        }
         inventory.setItem(49, item(Material.SUNFLOWER, "§eAktualisieren"));
         inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
         player.openInventory(inventory);
@@ -98,6 +105,10 @@ public final class ArenaManagementMenu implements Listener {
             inventory.setItem(22, item(Material.BARRIER, "§cVorlagen konnten nicht gelesen werden"));
         }
         inventory.setItem(45, item(Material.ARROW, "§eZurück zu den Arenen"));
+        if (editingReturnLocations.containsKey(player.getUniqueId())) {
+            inventory.setItem(47, item(Material.OAK_DOOR, "§eVorlage verlassen",
+                    "§7Zurück zum vorherigen Standort", "§7und die Vorlage sicher entladen."));
+        }
         inventory.setItem(49, item(Material.SUNFLOWER, "§eErneut scannen"));
         inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
         player.openInventory(inventory);
@@ -174,6 +185,91 @@ public final class ArenaManagementMenu implements Listener {
         inventory.setItem(11, item(Material.LIME_CONCRETE, "§aJa, löschen"));
         inventory.setItem(15, item(Material.RED_CONCRETE, "§cAbbrechen"));
         player.openInventory(inventory);
+    }
+
+    private void openTemplateDetails(Player player, String templateId) {
+        try {
+            var template = plugin.getMapManager().inspectTemplate(templateId);
+            MenuHolder holder = new MenuHolder(Screen.TEMPLATE_DETAILS, templateId, null);
+            Inventory inventory = inventory(holder, "ManHunt • Vorlage " + templateId);
+            inventory.setItem(4, item(template.valid() ? Material.GRASS_BLOCK : Material.BARRIER,
+                    "§e" + templateId,
+                    "§7Status: " + statusColor(template) + template.status(),
+                    "§7Wird als Original bearbeitet; Spielrunden verwenden weiterhin Kopien.",
+                    "§cDie Originalvorlage niemals während einer laufenden Bearbeitung löschen."));
+            inventory.setItem(20, item(template.loaded() ? Material.ENDER_PEARL : Material.COMPASS,
+                    template.loaded() ? "§aWelt betreten" : "§aVorlage laden & betreten",
+                    "§7Lädt die Originalwelt, falls nötig.",
+                    "§7Teleportiert dich zum Weltspawn.",
+                    "§7Danach kannst du Spawnpunkte setzen."));
+            inventory.setItem(22, item(Material.CHEST, "§eAls Arena registrieren/öffnen",
+                    "§7Erstellt den Arena-Eintrag, falls er fehlt.",
+                    "§7Öffnet anschließend die Spawnpunkt-Verwaltung."));
+            if (plugin.getMapManager().isLoadedForEditing(templateId)) {
+                inventory.setItem(24, item(Material.REDSTONE_BLOCK, "§cVorlage entladen",
+                        "§7Nur möglich, wenn sich keine Spieler",
+                        "§7mehr in dieser Welt befinden."));
+            } else if (template.loaded()) {
+                inventory.setItem(24, item(Material.GRAY_DYE, "§7Bereits anderweitig geladen",
+                        "§7Diese Welt wurde nicht von der",
+                        "§7ManHunt-Vorlagenbearbeitung geladen."));
+            }
+            inventory.setItem(45, item(Material.ARROW, "§eZurück"));
+            inventory.setItem(49, item(Material.SUNFLOWER, "§eAktualisieren"));
+            inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
+            player.openInventory(inventory);
+        } catch (IllegalArgumentException exception) {
+            player.sendMessage("§cVorlage konnte nicht geöffnet werden: " + exception.getMessage());
+            openTemplates(player);
+        }
+    }
+
+    /** Loads a template and teleports an administrator into it for editing. */
+    public void enterTemplateForEditing(Player player, String templateId) {
+        if (!allowed(player)) return;
+        try {
+            World world = plugin.getMapManager().loadTemplateForEditing(templateId);
+            if (!player.getWorld().equals(world)) {
+                editingReturnLocations.putIfAbsent(player.getUniqueId(), player.getLocation().clone());
+                if (!player.teleport(world.getSpawnLocation())) {
+                    player.sendMessage("§cTeleport in die Vorlagenwelt fehlgeschlagen.");
+                    return;
+                }
+            }
+            player.closeInventory();
+            player.sendMessage("§aDu bearbeitest jetzt die Originalvorlage §e" + templateId + "§a.");
+            player.sendMessage("§7Nutze §e/manhunt arenas §7für Spawnpunkte. Mit §eVorlage verlassen §7kehrst du zurück.");
+        } catch (IOException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cVorlage konnte nicht geladen werden: " + exception.getMessage());
+        }
+    }
+
+    /** Returns the administrator to their previous location, then safely unloads our template world. */
+    public void leaveTemplateEditing(Player player) {
+        if (!allowed(player)) return;
+        Location returnLocation = editingReturnLocations.remove(player.getUniqueId());
+        if (returnLocation == null) {
+            player.sendMessage("§eFür dich ist keine aktive Vorlagenbearbeitung gespeichert.");
+            return;
+        }
+        if (!player.teleport(returnLocation)) {
+            editingReturnLocations.put(player.getUniqueId(), returnLocation);
+            player.sendMessage("§cRückteleport fehlgeschlagen. Du befindest dich weiterhin in der Vorlagenwelt.");
+            return;
+        }
+        String templateId = returnLocation.getWorld() == null ? null : player.getWorld().getName();
+        player.sendMessage("§aDu hast die Vorlagenwelt verlassen.");
+        if (templateId != null) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                try {
+                    boolean unloaded = plugin.getMapManager().unloadTemplateAfterEditing(templateId);
+                    if (unloaded) player.sendMessage("§aDie Vorlagenwelt wurde gespeichert und entladen.");
+                    else player.sendMessage("§7Die Welt war bereits vor der Bearbeitung geladen und bleibt deshalb geladen.");
+                } catch (IllegalStateException exception) {
+                    player.sendMessage("§eDie Vorlage bleibt geladen, da sich noch andere Spieler darin befinden.");
+                }
+            });
+        }
     }
 
     private void createFromTemplate(Player player, String templateId) {
@@ -260,16 +356,35 @@ public final class ArenaManagementMenu implements Listener {
 
         if (holder.screen == Screen.ARENAS) {
             if (slot == 45) { openTemplates(player); return; }
+            if (slot == 47 && editingReturnLocations.containsKey(player.getUniqueId())) { leaveTemplateEditing(player); return; }
             if (slot == 49) { openArenaList(player); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String id = holder.entries.get(slot);
             if (id != null) openDetails(player, id);
         } else if (holder.screen == Screen.TEMPLATES) {
             if (slot == 45) { openArenaList(player); return; }
+            if (slot == 47 && editingReturnLocations.containsKey(player.getUniqueId())) { leaveTemplateEditing(player); return; }
             if (slot == 49) { openTemplates(player); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String id = holder.entries.get(slot);
-            if (id != null) createFromTemplate(player, id);
+            if (id != null) openTemplateDetails(player, id);
+        } else if (holder.screen == Screen.TEMPLATE_DETAILS) {
+            if (slot == 45) { openTemplates(player); return; }
+            if (slot == 49) { openTemplateDetails(player, holder.arenaId); return; }
+            if (slot == 53) { player.closeInventory(); return; }
+            if (slot == 20) { enterTemplateForEditing(player, holder.arenaId); return; }
+            if (slot == 22) { createFromTemplate(player, holder.arenaId); return; }
+            if (slot == 24) {
+                try {
+                    boolean unloaded = plugin.getMapManager().unloadTemplateAfterEditing(holder.arenaId);
+                    player.sendMessage(unloaded ? "§aVorlage wurde gespeichert und entladen."
+                            : "§eDiese Vorlage wurde nicht von der Bearbeitungsfunktion geladen und bleibt geöffnet.");
+                    openTemplateDetails(player, holder.arenaId);
+                } catch (IllegalStateException exception) {
+                    player.sendMessage("§c" + exception.getMessage());
+                }
+                return;
+            }
         } else if (holder.screen == Screen.DETAILS) {
             if (slot == 45) { openArenaList(player); return; }
             if (slot == 47 || slot == 48) {
@@ -385,7 +500,7 @@ public final class ArenaManagementMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { ARENAS, TEMPLATES, DETAILS, CONFIRM }
+    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, DETAILS, CONFIRM }
     private enum InputAction { RENAME, CHANGE_TEMPLATE }
     private record PendingInput(String arenaId, InputAction action) { }
 
