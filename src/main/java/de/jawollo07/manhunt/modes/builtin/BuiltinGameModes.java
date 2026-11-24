@@ -80,6 +80,18 @@ public final class BuiltinGameModes {
         protected void finish(Game game, GameOutcome outcome, List<UUID> winners, String reason) {
             if (ended || game.getState() != GameState.RUNNING) return;
             ended = true;
+            announce("Runde beendet: " + reason);
+            if (winners.isEmpty()) {
+                announce("Es gibt keinen Gewinner.");
+            } else {
+                String winnerNames = winners.stream()
+                        .map(id -> {
+                            String name = Bukkit.getOfflinePlayer(id).getName();
+                            return name == null ? id.toString().substring(0, 8) : name;
+                        })
+                        .collect(java.util.stream.Collectors.joining("§7, §e"));
+                announce("Gewinner: §e" + winnerNames);
+            }
             // Death-triggered victories must be finalized after Bukkit has completed
             // the death/respawn sequence; restoring a snapshot inside PlayerDeathEvent
             // can otherwise attempt to heal a player before respawn.
