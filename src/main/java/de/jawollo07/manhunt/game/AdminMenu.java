@@ -68,7 +68,15 @@ public final class AdminMenu implements Listener {
             inventory.setItem(20, item(Material.REDSTONE_BLOCK, "§cRunde stoppen",
                     "§7Beendet die aktuelle Runde und stellt Spieler wieder her."));
         }
-        inventory.setItem(22, item(Material.BARRIER, "§cSchließen"));
+        if (game.getState() == GameState.COUNTDOWN) {
+            inventory.setItem(22, item(Material.RED_DYE, "§cCountdown abbrechen",
+                    "§7Bringt die Lobby zurück in den Wartezustand."));
+        } else if (game.getState() == GameState.LOBBY || game.getState() == GameState.WAITING) {
+            inventory.setItem(22, item(Material.LIME_DYE, "§aCountdown starten",
+                    "§7Startet den Countdown, sofern genug Spieler dabei sind."));
+        } else {
+            inventory.setItem(22, item(Material.BARRIER, "§cSchließen"));
+        }
         player.openInventory(inventory);
     }
 
@@ -180,9 +188,21 @@ public final class AdminMenu implements Listener {
             return;
         }
         int slot = event.getRawSlot();
-        if (slot == 49 || (holder.screen == Screen.SETTINGS && slot == 26)
-                || (holder.screen == Screen.OVERVIEW && slot == 22)) {
+        if (slot == 49 || (holder.screen == Screen.SETTINGS && slot == 26)) {
             player.closeInventory();
+            return;
+        }
+        if (holder.screen == Screen.OVERVIEW && slot == 22) {
+            Game active = plugin.getGameManager().getActiveGame().orElse(null);
+            if (active == null) {
+                openModes(player);
+            } else if (active.getState() == GameState.COUNTDOWN) {
+                Bukkit.dispatchCommand(player, "manhunt game cancel");
+                open(player);
+            } else if (active.getState() == GameState.LOBBY || active.getState() == GameState.WAITING) {
+                Bukkit.dispatchCommand(player, "manhunt game start");
+                open(player);
+            }
             return;
         }
         if (holder.screen == Screen.OVERVIEW && slot == 20) {
