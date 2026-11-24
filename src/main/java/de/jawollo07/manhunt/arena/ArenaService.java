@@ -16,7 +16,7 @@ public final class ArenaService {
     public void save(Arena arena) throws SQLException {
         Objects.requireNonNull(arena, "arena");
         validateIdentifier(arena.id(), "arena id");
-        validateIdentifier(arena.worldName(), "map template id");
+        validateTemplateIdentifier(arena.worldName());
         repository.save(arena);
     }
 
@@ -31,6 +31,12 @@ public final class ArenaService {
     public boolean delete(String id) throws SQLException {
         validateIdentifier(id, "arena id");
         return repository.delete(id);
+    }
+
+    private void validateTemplateIdentifier(String value) {
+        if (value == null || !value.matches("[a-zA-Z0-9_-]{1,48}")) {
+            throw new IllegalArgumentException("Invalid map template id: " + value);
+        }
     }
 
     private void validateIdentifier(String value, String label) {
