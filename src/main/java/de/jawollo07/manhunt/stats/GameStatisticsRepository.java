@@ -122,9 +122,7 @@ public final class GameStatisticsRepository {
                 """ + modeFilter + """
                 GROUP BY p.player_uuid
                 ORDER BY wins DESC,
-                         (1.0 * wins / COUNT(*)) DESC,
                          games_played DESC,
-                         total_seconds DESC,
                          p.player_uuid ASC
                 LIMIT ?
                 """;
