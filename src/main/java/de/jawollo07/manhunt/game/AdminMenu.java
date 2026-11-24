@@ -156,6 +156,9 @@ public final class AdminMenu implements Listener {
                     () -> new IllegalStateException("Der Spielmodus ist nicht mehr verfügbar."));
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
                     () -> new IllegalStateException("Die Arena ist nicht mehr verfügbar."));
+            var template = plugin.getMapManager().inspectTemplate(arena.worldName());
+            if (!template.valid()) throw new IllegalStateException("Kartenvorlage ist ungültig: " + template.status());
+            if (template.loaded()) throw new IllegalStateException("Kartenvorlage ist noch geladen. Entlade die Welt zuerst.");
             var mode = factory.createSession();
             int minimum = Math.max(plugin.getConfigManager().getInt("game.min-players", 2), mode.getMinimumPlayers());
             GameSettings settings = new GameSettings(
