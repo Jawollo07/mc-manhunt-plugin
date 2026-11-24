@@ -166,6 +166,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
             plugin.getGameManager().transition(GameState.COUNTDOWN);
         }
         countdownRemaining = game.getSettings().countdownSeconds();
+        game.setCountdownRemainingSeconds(countdownRemaining);
         Bukkit.broadcastMessage("§6[ManHunt] §eGenügend Spieler! Die Runde startet in "
                 + countdownRemaining + " Sekunden.");
         playGameSound(game, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 1.2f);
@@ -188,6 +189,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                 return;
             }
             countdownRemaining--;
+            game.setCountdownRemainingSeconds(countdownRemaining);
             if (countdownRemaining <= 0) {
                 cancelCountdownTask();
                 launch(game);
@@ -204,6 +206,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
             countdownTask = null;
         }
         countdownRemaining = -1;
+        plugin.getGameManager().getActiveGame().ifPresent(game -> game.setCountdownRemainingSeconds(-1));
     }
 
     private void broadcastLobbyStatus(Game game) {
