@@ -10,6 +10,9 @@ public interface GameMode {
     String getId();
     String getDisplayName();
 
+    /** Minimum roster size required by this mode before its countdown may start. */
+    default int getMinimumPlayers() { return 2; }
+
     default void onPrepare(Game game) {}
     default void onStart(Game game) {}
     default void onEnd(Game game) {}
