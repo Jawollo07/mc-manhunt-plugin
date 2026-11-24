@@ -31,6 +31,17 @@ class BuiltinGameModesTest {
     }
 
     @Test
+    void hitmanRequiresThreePlayersWhileOtherModesRequireTwo() {
+        GameModeRegistry registry = new GameModeRegistry();
+        BuiltinGameModes.factories(null).forEach(registry::register);
+
+        assertEquals(3, registry.createSession("hitman").orElseThrow().getMinimumPlayers());
+        assertEquals(2, registry.createSession("assassin").orElseThrow().getMinimumPlayers());
+        assertEquals(2, registry.createSession("juggernaut").orElseThrow().getMinimumPlayers());
+        assertEquals(2, registry.createSession("infection").orElseThrow().getMinimumPlayers());
+    }
+
+    @Test
     void modeIdsAreCaseInsensitive() {
         GameModeRegistry registry = new GameModeRegistry();
         BuiltinGameModes.factories(null).forEach(registry::register);
