@@ -277,8 +277,8 @@ public final class ArenaManagementMenu implements Listener {
                         slot == 47 ? InputAction.RENAME : InputAction.CHANGE_TEMPLATE));
                 player.closeInventory();
                 player.sendMessage(slot == 47
-                        ? "§eGib den neuen Anzeigenamen im Chat ein. Mit "-" abbrechen."
-                        : "§eGib die ID der neuen Kartenvorlage im Chat ein. Mit "-" abbrechen.");
+                        ? "§eGib den neuen Anzeigenamen im Chat ein. Mit '-' abbrechen."
+                        : "§eGib die ID der neuen Kartenvorlage im Chat ein. Mit '-' abbrechen.");
                 return;
             }
             if (slot == 49) { openConfirm(player, holder.arenaId, null); return; }
