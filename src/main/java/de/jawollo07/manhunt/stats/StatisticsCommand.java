@@ -13,7 +13,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 
 public final class StatisticsCommand implements CommandExecutor, TabCompleter {
     private final ManHuntPlugin plugin;
@@ -47,6 +46,7 @@ public final class StatisticsCommand implements CommandExecutor, TabCompleter {
         }
         try {
             if ("all".equalsIgnoreCase(modeId)) modeId = null;
+            else if (modeId != null) modeId = modeId.toLowerCase(Locale.ROOT);
             var stats = plugin.getStatisticsRepository().getPlayerStatistics(player.getUniqueId(), modeId);
             if (stats.isEmpty()) {
                 sender.sendMessage("§eFür dich liegen" + (modeId == null ? "" : " im Modus §6" + modeId + "§e")
@@ -68,6 +68,7 @@ public final class StatisticsCommand implements CommandExecutor, TabCompleter {
     private void showLeaderboard(CommandSender sender, String modeId) {
         try {
             if ("all".equalsIgnoreCase(modeId)) modeId = null;
+            else if (modeId != null) modeId = modeId.toLowerCase(Locale.ROOT);
             List<LeaderboardEntry> entries = plugin.getStatisticsRepository().getLeaderboard(modeId, 10);
             sender.sendMessage("§6ManHunt-Bestenliste" + (modeId == null ? " §7(Gesamt)" : " §7(" + modeId + ")"));
             if (entries.isEmpty()) {
