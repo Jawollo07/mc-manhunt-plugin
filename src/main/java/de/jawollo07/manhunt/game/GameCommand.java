@@ -172,6 +172,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         playGameSound(game, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 1.2f);
         if (countdownRemaining <= 0) {
             countdownRemaining = -1;
+            game.setCountdownRemainingSeconds(-1);
             launch(game);
             return;
         }
