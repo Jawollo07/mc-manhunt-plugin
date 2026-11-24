@@ -4,6 +4,7 @@ import de.jawollo07.manhunt.arena.ArenaRepository;
 import de.jawollo07.manhunt.arena.ArenaService;
 import de.jawollo07.manhunt.game.GameLifecycleService;
 import de.jawollo07.manhunt.game.GameManager;
+import de.jawollo07.manhunt.game.LobbyMenu;
 import de.jawollo07.manhunt.map.MapManager;
 import de.jawollo07.manhunt.modes.GameModeFactory;
 import de.jawollo07.manhunt.modes.GameModeRegistry;
@@ -32,6 +33,7 @@ public final class ManHuntPlugin extends JavaPlugin {
     private StorageManager storageManager;
     private GameStatisticsRepository statisticsRepository;
     private ManHuntCommand commandHandler;
+    private LobbyMenu lobbyMenu;
 
     @Override
     public void onEnable() {
@@ -77,6 +79,9 @@ public final class ManHuntPlugin extends JavaPlugin {
                 new de.jawollo07.manhunt.modes.builtin.JuggernautAbilityListener(gameManager),
                 this
         );
+
+        lobbyMenu = new LobbyMenu(this);
+        getServer().getPluginManager().registerEvents(lobbyMenu, this);
 
         PluginCommand command = getCommand("manhunt");
         if (command == null) {
@@ -134,4 +139,5 @@ public final class ManHuntPlugin extends JavaPlugin {
     public ArenaService getArenaService() { return arenaService; }
     public StorageManager getStorageManager() { return storageManager; }
     public GameStatisticsRepository getStatisticsRepository() { return statisticsRepository; }
+    public LobbyMenu getLobbyMenu() { return lobbyMenu; }
 }
