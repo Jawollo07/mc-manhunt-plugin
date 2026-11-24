@@ -93,7 +93,7 @@ public final class Game {
 
     public void addPlayer(GamePlayer player) {
         Objects.requireNonNull(player, "player");
-        if (state != GameState.WAITING && state != GameState.LOBBY) {
+        if (state != GameState.WAITING && state != GameState.LOBBY && state != GameState.COUNTDOWN) {
             throw new IllegalStateException("Players cannot join while game state is " + state);
         }
         if (players.containsKey(player.getUniqueId())) {
