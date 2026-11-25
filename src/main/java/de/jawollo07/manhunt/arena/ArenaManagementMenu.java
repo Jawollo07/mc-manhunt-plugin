@@ -502,17 +502,27 @@ public final class ArenaManagementMenu implements Listener {
         try {
             Arena arena = plugin.getArenaService().find(pending.arenaId()).orElseThrow(
                     () -> new IllegalStateException("Arena nicht gefunden."));
-            if (pending.action() == InputAction.RENAME) {
-                plugin.getArenaService().save(new Arena(arena.id(), value, arena.worldName(), arena.spawnPoints()));
-                player.sendMessage("§aAnzeigename wurde geändert.");
-            } else {
-                var template = plugin.getMapManager().inspectTemplate(value);
-                if (!template.valid()) throw new IllegalArgumentException("Keine gültige Vorlage: " + template.status());
-                plugin.getArenaService().save(new Arena(arena.id(), arena.displayName(), value));
-                player.sendMessage("§aKartenvorlage geändert. §eAlle bisherigen Spawnpunkte wurden zurückgesetzt, da sie zur alten Karte gehörten.");
-                if (template.loaded()) player.sendMessage("§eDie neue Vorlagenwelt muss vor Spielstart entladen werden.");
+            switch (pending.action()) {
+                case RENAME -> {
+                    plugin.getArenaService().save(new Arena(arena.id(), value, arena.worldName(), arena.spawnPoints()));
+                    player.sendMessage("§aAnzeigename wurde geändert.");
+                    openDetails(player, pending.arenaId());
+                }
+                case CHANGE_TEMPLATE -> {
+                    var template = plugin.getMapManager().inspectTemplate(value);
+                    if (!template.valid()) throw new IllegalArgumentException("Keine gültige Vorlage: " + template.status());
+                    plugin.getArenaService().save(new Arena(arena.id(), arena.displayName(), value));
+                    player.sendMessage("§aKartenvorlage geändert. §eAlle bisherigen Spawnpunkte wurden zurückgesetzt, da sie zur alten Karte gehörten.");
+                    if (template.loaded()) player.sendMessage("§eDie neue Vorlagenwelt muss vor Spielstart entladen werden.");
+                    openDetails(player, pending.arenaId());
+                }
+                case DUPLICATE -> {
+                    Arena copy = plugin.getArenaService().duplicate(arena.id(), value, arena.displayName() + " (Kopie)");
+                    player.sendMessage("§aArena §e" + copy.id() + " §awurde mit " + copy.spawnPoints().size()
+                            + " Spawnpunkten dupliziert.");
+                    openDetails(player, copy.id());
+                }
             }
-            openDetails(player, pending.arenaId());
         } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
             player.sendMessage("§cÄnderung fehlgeschlagen: " + exception.getMessage());
             openDetails(player, pending.arenaId());
