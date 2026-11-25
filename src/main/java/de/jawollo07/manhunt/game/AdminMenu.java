@@ -233,7 +233,7 @@ public final class AdminMenu implements Listener {
             return;
         }
         int slot = event.getRawSlot();
-        if (slot == 49 || (holder.screen == Screen.SETTINGS && slot == 26)) {
+        if ((slot == 49 && holder.screen != Screen.TEAM_ASSIGNMENTS) || (holder.screen == Screen.SETTINGS && slot == 26)) {
             player.closeInventory();
             return;
         }
