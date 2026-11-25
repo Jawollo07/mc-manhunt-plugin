@@ -312,7 +312,7 @@ public final class ArenaManagementMenu implements Listener {
             }
             Arena arena = plugin.getArenaService().find(templateId).orElse(null);
             if (arena == null) {
-                String displayName = templateId.replace('_', ' ').replace('-', ' ');
+                String displayName = templateId.substring(templateId.lastIndexOf(':') + 1).replace('_', ' ').replace('-', ' ');
                 displayName = java.util.Arrays.stream(displayName.split("\\s+"))
                         .filter(part -> !part.isBlank())
                         .map(part -> part.substring(0, 1).toUpperCase(Locale.ROOT)
@@ -335,7 +335,7 @@ public final class ArenaManagementMenu implements Listener {
         try {
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
                     () -> new IllegalStateException("Arena nicht gefunden."));
-            if (!player.getWorld().getName().equals(arena.worldName())) {
+            if (!plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName())) {
                 player.sendMessage("§cGehe zuerst in die Vorlagenwelt §e" + arena.worldName()
                         + " §cund öffne dort erneut die Arenaverwaltung.");
                 return;
@@ -436,7 +436,7 @@ public final class ArenaManagementMenu implements Listener {
                 if (event.getClick().isRightClick()) {
                     try {
                         Arena arena = plugin.getArenaService().find(holder.arenaId).orElseThrow();
-                        if (!player.getWorld().getName().equals(arena.worldName())) {
+                        if (!plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName())) {
                             player.sendMessage("§cZum Testen musst du dich in der Vorlagenwelt befinden.");
                             return;
                         }
