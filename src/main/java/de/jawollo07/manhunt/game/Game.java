@@ -22,6 +22,7 @@ public final class Game {
     private final Arena arena;
     private final GameSettings settings;
     private final Map<UUID, GamePlayer> players = new LinkedHashMap<>();
+    private final Map<UUID, String> lobbyTeamPreferences = new LinkedHashMap<>();
     private final RoleManager roleManager = new RoleManager();
     private final TeamManager teamManager = new TeamManager();
 
@@ -77,6 +78,21 @@ public final class Game {
         return Optional.of(Duration.between(startedAt, endedAt == null ? Instant.now() : endedAt));
     }
 
+    public Optional<String> getLobbyTeamPreference(UUID playerId) {
+        return Optional.ofNullable(lobbyTeamPreferences.get(Objects.requireNonNull(playerId, "playerId")));
+    }
+
+    public void setLobbyTeamPreference(UUID playerId, String teamKey) {
+        if (state != GameState.WAITING && state != GameState.LOBBY && state != GameState.COUNTDOWN) {
+            throw new IllegalStateException("Lobby teams can only be changed before the game starts");
+        }
+        if (!players.containsKey(Objects.requireNonNull(playerId, "playerId"))) {
+            throw new IllegalArgumentException("Player is not part of this game");
+        }
+        if (teamKey == null || teamKey.isBlank()) lobbyTeamPreferences.remove(playerId);
+        else lobbyTeamPreferences.put(playerId, teamKey.toLowerCase(java.util.Locale.ROOT));
+    }
+
     public Collection<GamePlayer> getPlayers() {
         return Collections.unmodifiableCollection(players.values());
     }
@@ -114,6 +130,7 @@ public final class Game {
     public Optional<GamePlayer> removePlayer(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         GamePlayer removed = players.remove(playerId);
+        lobbyTeamPreferences.remove(playerId);
         if (removed != null) {
             roleManager.remove(playerId);
             teamManager.removePlayer(playerId);
