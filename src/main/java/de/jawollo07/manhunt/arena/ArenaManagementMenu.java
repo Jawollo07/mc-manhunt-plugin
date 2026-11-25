@@ -601,16 +601,19 @@ public final class ArenaManagementMenu implements Listener {
     }
 
     private String modeSettingsSummary(Arena arena, String modeId) {
+        String time = settingValueLabel("time_limit_seconds", arena.modeSetting(modeId, "time_limit_seconds", "0"));
         return switch (modeId.toLowerCase(Locale.ROOT)) {
-            case "assassin" -> "Zielverteilung "
-                    + settingValueLabel("target_distribution", arena.modeSetting(modeId, "target_distribution", "cycle"));
+            case "assassin" -> "Ziele " + settingValueLabel("target_distribution",
+                    arena.modeSetting(modeId, "target_distribution", "cycle")) + ", Zeit " + time;
             case "hitman" -> "Hitmen " + settingValueLabel("hitman_count", arena.modeSetting(modeId, "hitman_count", "0"))
-                    + ", Evakuierung " + settingValueLabel("extraction_enabled", arena.modeSetting(modeId, "extraction_enabled", "true"));
+                    + ", Evakuierung " + settingValueLabel("extraction_enabled", arena.modeSetting(modeId, "extraction_enabled", "true"))
+                    + ", Radius " + arena.modeSetting(modeId, "extraction_radius", "4") + " Blöcke, Zeit " + time;
             case "juggernaut" -> arena.modeSetting(modeId, "boss_health", "40") + " HP, "
                     + (int) java.util.stream.Stream.of("ability_slam", "ability_charge", "ability_roar", "ability_regeneration")
-                            .filter(key -> arena.modeBooleanSetting(modeId, key, true)).count() + "/4 Fähigkeiten";
+                            .filter(key -> arena.modeBooleanSetting(modeId, key, true)).count() + "/4 Fähigkeiten, Zeit " + time;
             case "infection" -> "Start-Infizierte "
-                    + settingValueLabel("initial_infected", arena.modeSetting(modeId, "initial_infected", "0"));
+                    + settingValueLabel("initial_infected", arena.modeSetting(modeId, "initial_infected", "0"))
+                    + ", Zeit " + time;
             default -> "Standard";
         };
     }
