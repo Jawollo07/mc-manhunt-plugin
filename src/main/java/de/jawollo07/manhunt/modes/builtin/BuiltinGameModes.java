@@ -282,12 +282,13 @@ public final class BuiltinGameModes {
                 return;
             }
             targets.put(hunterId, target);
+            UUID assignedTarget = target;
             Player hunter = Bukkit.getPlayer(hunterId);
             if (hunter != null) {
-                String name = java.util.Optional.ofNullable(Bukkit.getPlayer(target))
+                String name = java.util.Optional.ofNullable(Bukkit.getPlayer(assignedTarget))
                         .map(Player::getName)
-                        .orElseGet(() -> java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(target).getName())
-                                .orElse(target.toString().substring(0, 8)));
+                        .orElseGet(() -> java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(assignedTarget).getName())
+                                .orElse(assignedTarget.toString().substring(0, 8)));
                 hunter.sendMessage(message + ": §c" + name);
             }
         }
