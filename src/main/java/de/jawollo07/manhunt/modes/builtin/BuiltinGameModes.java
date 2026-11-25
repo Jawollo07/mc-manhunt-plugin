@@ -135,21 +135,58 @@ public final class BuiltinGameModes {
             game.getRoleManager().assign(player.getUniqueId(), role, team.getId());
         }
 
+        /**
+         * Builds a role order while honoring explicit lobby team wishes first.
+         * Each side gets its requested players up to capacity; neutral players
+         * fill remaining places and over-subscribed wishes fall back to the other side.
+         */
         protected List<GamePlayer> orderedForTeams(Game game, List<GamePlayer> source,
-                                                   String primaryKey, String secondaryKey) {
-            List<GamePlayer> players = new ArrayList<>(source);
-            if (game.getSettings().randomTeamDistribution()) Collections.shuffle(players);
-            List<GamePlayer> primary = players.stream()
-                    .filter(p -> game.getLobbyTeamPreference(p.getUniqueId()).orElse("").equals(primaryKey)).toList();
-            List<GamePlayer> neutral = players.stream()
-                    .filter(p -> game.getLobbyTeamPreference(p.getUniqueId()).isEmpty()).toList();
-            List<GamePlayer> secondary = players.stream()
-                    .filter(p -> game.getLobbyTeamPreference(p.getUniqueId()).orElse("").equals(secondaryKey)).toList();
-            List<GamePlayer> ordered = new ArrayList<>();
+                                                   String primaryKey, String secondaryKey,
+                                                   int primaryCapacity) {
+            List<GamePlayer> shuffled = new ArrayList<>(source);
+            if (game.getSettings().randomTeamDistribution()) Collections.shuffle(shuffled);
+            List<GamePlayer> primaryWishes = new ArrayList<>();
+            List<GamePlayer> secondaryWishes = new ArrayList<>();
+            List<GamePlayer> neutral = new ArrayList<>();
+            for (GamePlayer player : shuffled) {
+                String preference = game.getLobbyTeamPreference(player.getUniqueId()).orElse("");
+                if (preference.equals(primaryKey)) primaryWishes.add(player);
+                else if (preference.equals(secondaryKey)) secondaryWishes.add(player);
+                else neutral.add(player);
+            }
+
+            int secondaryCapacity = shuffled.size() - primaryCapacity;
+            List<GamePlayer> primary = take(primaryWishes, primaryCapacity);
+            List<GamePlayer> secondary = take(secondaryWishes, secondaryCapacity);
+            List<GamePlayer> overflow = new ArrayList<>();
+            overflow.addAll(primaryWishes.subList(primary.size(), primaryWishes.size()));
+            overflow.addAll(secondaryWishes.subList(secondary.size(), secondaryWishes.size()));
+
+            fill(primary, neutral, primaryCapacity);
+            fill(secondary, neutral, secondaryCapacity);
+            fill(primary, overflow, primaryCapacity);
+            fill(secondary, overflow, secondaryCapacity);
+
+            List<GamePlayer> ordered = new ArrayList<>(shuffled.size());
             ordered.addAll(primary);
-            ordered.addAll(neutral);
             ordered.addAll(secondary);
             return ordered;
+        }
+
+        private List<GamePlayer> take(List<GamePlayer> source, int capacity) {
+            int count = Math.min(source.size(), Math.max(0, capacity));
+            return new ArrayList<>(source.subList(0, count));
+        }
+
+        private void fill(List<GamePlayer> target, List<GamePlayer> source, int capacity) {
+            while (target.size() < capacity && !source.isEmpty()) {
+                target.add(source.remove(0));
+            }
+        }
+
+        protected long activeTeamCount(Game game, Team team) {
+            return team.getMembers().stream().filter(id ->
+                    game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).count();
         }
 
         protected void apply(Player player, PotionEffectType type, int duration, int amplifier) {
@@ -242,7 +279,7 @@ public final class BuiltinGameModes {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 3) throw new IllegalStateException("Hitman benötigt mindestens drei Spieler.");
             int hitmanCount = players.size() >= 7 ? 2 : 1;
-            players = orderedForTeams(game, players, "hitmen", "survivors");
+            players = orderedForTeams(game, players, "hitmen", "survivors", hitmanCount);
             hitmen = team(game, "Hitmen", "DARK_RED");
             survivors = team(game, "Survivors", "GREEN");
             for (int i = 0; i < players.size(); i++) {
@@ -321,7 +358,7 @@ public final class BuiltinGameModes {
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 2) throw new IllegalStateException("Juggernaut benötigt mindestens zwei Spieler.");
-            players = orderedForTeams(game, players, "juggernaut", "hunters");
+            players = orderedForTeams(game, players, "juggernaut", "hunters", 1);
             bossId = players.get(0).getUniqueId();
             bossTeam = team(game, "Juggernaut", "DARK_RED");
             hunters = team(game, "Hunters", "BLUE");
@@ -383,7 +420,7 @@ public final class BuiltinGameModes {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 2) throw new IllegalStateException("Infection benötigt mindestens zwei Spieler.");
             int initial = players.size() >= 7 ? 2 : 1;
-            players = orderedForTeams(game, players, "infected", "survivors");
+            players = orderedForTeams(game, players, "infected", "survivors", initial);
             infected = team(game, "Infected", "DARK_GREEN");
             survivors = team(game, "Survivors", "AQUA");
             for (int i = 0; i < players.size(); i++) {
