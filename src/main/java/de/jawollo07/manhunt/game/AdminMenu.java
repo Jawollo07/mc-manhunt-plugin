@@ -382,9 +382,9 @@ public final class AdminMenu implements Listener {
 
     private List<String> teamKeys(String modeId) {
         return switch (modeId.toLowerCase(java.util.Locale.ROOT)) {
-            case "hitman" -> List.of("hitmen", "survivors", "");
-            case "juggernaut" -> List.of("juggernaut", "hunters", "");
-            case "infection" -> List.of("infected", "survivors", "");
+            case "hitman" -> List.of("", "hitmen", "survivors");
+            case "juggernaut" -> List.of("", "juggernaut", "hunters");
+            case "infection" -> List.of("", "infected", "survivors");
             default -> List.of("");
         };
     }
