@@ -219,7 +219,7 @@ public final class MapManager {
                 ? new WorldCreator(templateId) : WorldCreator.ofKey(location.dimensionKey());
         World world = Bukkit.createWorld(creator);
         if (world == null) throw new IOException("Paper could not load map template: " + templateId);
-        editorLoadedTemplates.add(templateId.toLowerCase(Locale.ROOT));
+        editorLoadedTemplates.add(normalizeEditorKey(templateId));
         plugin.getLogger().info("Loaded map template for editing: " + templateId);
         return world;
     }
@@ -227,7 +227,7 @@ public final class MapManager {
     public boolean unloadTemplateAfterEditing(String templateId) {
         requireServerThread();
         validateTemplateId(templateId);
-        String key = templateId.toLowerCase(Locale.ROOT);
+        String key = normalizeEditorKey(templateId);
         if (!editorLoadedTemplates.contains(key)) return false;
         World world = getLoadedTemplateWorld(templateId);
         if (world == null) {
@@ -244,7 +244,7 @@ public final class MapManager {
 
     public boolean isLoadedForEditing(String templateId) {
         requireServerThread();
-        return templateId != null && editorLoadedTemplates.contains(templateId.toLowerCase(Locale.ROOT));
+        return templateId != null && editorLoadedTemplates.contains(normalizeEditorKey(templateId));
     }
 
     public World getLoadedTemplateWorld(String templateId) {
