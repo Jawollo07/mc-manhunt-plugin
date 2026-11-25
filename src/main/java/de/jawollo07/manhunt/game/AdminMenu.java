@@ -121,7 +121,10 @@ public final class AdminMenu implements Listener {
                 String checkLine = !validation.errors().isEmpty()
                         ? "§cNicht startbereit: " + validation.errors().get(0)
                         : validation.warnings().isEmpty() ? "§aPrüfung: bereit"
-                        : "§eHinweis: " + validation.warnings().get(0);
+                        : "§eOptionale Punkte: " + validation.warnings().stream()
+                                .map(message -> message.replace("Optionaler Spawnpunkt fehlt: ", "")
+                                        .replace("Kein Standard-Spawnpunkt gesetzt – der natürliche Weltspawn wird verwendet.", "Weltspawn-Fallback"))
+                                .collect(java.util.stream.Collectors.joining(", "));
                 inventory.setItem(slot++, item(icon, (validation.ready() ? "§a" : "§c") + arena.displayName(),
                         "§7Arena-ID: §f" + arena.id(),
                         "§7Vorlage: §f" + arena.worldName(),
