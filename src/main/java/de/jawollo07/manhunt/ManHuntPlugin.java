@@ -80,6 +80,11 @@ public final class ManHuntPlugin extends JavaPlugin {
         );
 
         getServer().getPluginManager().registerEvents(
+                new de.jawollo07.manhunt.player.PlayerRespawnListener(gameManager, gameLifecycleService),
+                this
+        );
+
+        getServer().getPluginManager().registerEvents(
                 new de.jawollo07.manhunt.modes.builtin.JuggernautAbilityListener(gameManager),
                 this
         );
