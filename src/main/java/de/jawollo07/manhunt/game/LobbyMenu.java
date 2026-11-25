@@ -121,6 +121,8 @@ public final class LobbyMenu implements Listener {
                 meta.setDisplayName("§a" + name);
                 List<String> lore = new ArrayList<>();
                 lore.add(offline.isOnline() ? "§aOnline" : "§7Offline");
+                String teamPreference = game.getLobbyTeamPreference(participant.getUniqueId()).orElse("");
+                lore.add("§7Team: §f" + (teamPreference.isEmpty() ? "Automatisch" : lobbyTeamLabel(teamPreference)));
                 meta.setLore(lore);
                 head.setItemMeta(meta);
             }
