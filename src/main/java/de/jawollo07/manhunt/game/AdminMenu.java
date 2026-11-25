@@ -119,6 +119,7 @@ public final class AdminMenu implements Listener {
             int slot = FIRST_SLOT;
             for (Arena arena : arenas) {
                 if (slot > LAST_SLOT) break;
+                if (!arena.supportsMode(modeId)) continue;
                 holder.entries.put(slot, arena.id());
                 var template = plugin.getMapManager().inspectTemplate(arena.worldName());
                 ArenaValidation validation = ArenaValidation.check(arena, mode, template.valid(), template.loaded());
@@ -139,8 +140,9 @@ public final class AdminMenu implements Listener {
                         checkLine,
                         validation.ready() ? "§aKlicken für Einstellungen" : "§cVor Start erst Fehler beheben"));
             }
-            if (arenas.isEmpty()) inventory.setItem(22, item(Material.BARRIER, "§cKeine Arenen vorhanden",
-                    "§7Lege zuerst eine Arena mit /manhunt arena create an."));
+            if (slot == FIRST_SLOT) inventory.setItem(22, item(Material.BARRIER, "§cKeine passende Arena",
+                    "§7Es gibt keine Arena, die für diesen Modus freigegeben ist.",
+                    "§7Aktiviere den Modus in der Arena-Verwaltung."));
         } catch (SQLException | IllegalArgumentException exception) {
             plugin.getLogger().severe("Could not load arenas for admin menu: " + exception.getMessage());
             inventory.setItem(22, item(Material.BARRIER, "§cArenen konnten nicht geladen werden"));
