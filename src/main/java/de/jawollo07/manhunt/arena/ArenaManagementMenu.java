@@ -466,9 +466,16 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Gespeicherte Team-Spawnpunkte: §f" + teamSpawns,
                     "§7Mehrere Spawnpunkte pro Team sind möglich.",
                     "§eKlicken für die Team-Einrichtung"));
-            inventory.setItem(31, item(Material.BOOK,
-                    "§e5. Spielmodi & Abschlussprüfung",
-                    "§7Prüft jeden registrierten Spielmodus einzeln.",
+            int enabledModes = arena.enabledModeIds().isEmpty()
+                    ? plugin.getGameModeRegistry().getAll().size() : arena.enabledModeIds().size();
+            inventory.setItem(30, item(Material.NAME_TAG,
+                    "§e5. Spielmodi freigeben",
+                    "§7Freigegebene Modi: §f" + enabledModes,
+                    "§7Eine Arena kann mehrere Modi unterstützen.",
+                    "§eKlicken zum Auswählen"));
+            inventory.setItem(32, item(Material.BOOK,
+                    "§e6. Abschlussprüfung",
+                    "§7Prüft nur die für diese Arena freigegebenen Modi.",
                     "§7Zeigt fehlende Pflicht-Spawns und Hinweise.",
                     "§eKlicken für die vollständige Prüfung"));
             inventory.setItem(45, item(Material.ARROW, "§eZur Arena-Übersicht"));
@@ -523,6 +530,77 @@ public final class ArenaManagementMenu implements Listener {
         }
     }
 
+    /** Lets administrators choose which registered modes may use this arena. */
+    private void openModeSetup(Player player, String arenaId) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            setupArenaIds.put(player.getUniqueId(), arena.id());
+            List<de.jawollo07.manhunt.modes.GameModeFactory> modes =
+                    new java.util.ArrayList<>(plugin.getGameModeRegistry().getAll());
+            MenuHolder holder = new MenuHolder(Screen.MODE_SETUP, arena.id(), null);
+            Inventory inventory = inventory(holder, "ManHunt • Spielmodi freigeben");
+            inventory.setItem(4, item(Material.NAME_TAG, "§e5. Unterstützte Spielmodi",
+                    "§7Grün = freigegeben, grau = deaktiviert.",
+                    "§7Änderungen werden sofort gespeichert.",
+                    "§7Leere alte Einstellung bedeutet: alle Modi."));
+            java.util.Set<String> selected = arena.enabledModeIds().isEmpty()
+                    ? modes.stream().map(de.jawollo07.manhunt.modes.GameModeFactory::getId)
+                            .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new))
+                    : new java.util.LinkedHashSet<>(arena.enabledModeIds());
+            int slot = 10;
+            for (var mode : modes) {
+                if (slot > 43) break;
+                boolean enabled = selected.stream().anyMatch(id -> id.equalsIgnoreCase(mode.getId()));
+                holder.entries.put(slot, mode.getId());
+                inventory.setItem(slot++, item(enabled ? Material.LIME_CONCRETE : Material.GRAY_DYE,
+                        (enabled ? "§a" : "§7") + mode.getDisplayName(),
+                        "§7ID: §f" + mode.getId(),
+                        enabled ? "§aFür diese Arena freigegeben" : "§cFür diese Arena deaktiviert",
+                        "§eKlicken zum Umschalten"));
+            }
+            inventory.setItem(31, item(Material.BOOK, "§e" + selected.size() + " Modi freigegeben",
+                    "§7Mindestens ein Spielmodus muss aktiv bleiben.",
+                    "§7Die Spawn-Prüfung berücksichtigt nur diese Modi."));
+            inventory.setItem(45, item(Material.ARROW, "§eZurück zum Arena-Setup"));
+            inventory.setItem(49, item(Material.SUNFLOWER, "§eAktualisieren"));
+            inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
+            player.openInventory(inventory);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cSpielmodus-Auswahl konnte nicht geladen werden: " + exception.getMessage());
+            openSetup(player, arenaId);
+        }
+    }
+
+    private void toggleArenaMode(Player player, String arenaId, String modeId) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            java.util.Set<String> selected = arena.enabledModeIds().isEmpty()
+                    ? plugin.getGameModeRegistry().getAll().stream()
+                            .map(de.jawollo07.manhunt.modes.GameModeFactory::getId)
+                            .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new))
+                    : new java.util.LinkedHashSet<>(arena.enabledModeIds());
+            String existing = selected.stream().filter(id -> id.equalsIgnoreCase(modeId)).findFirst().orElse(null);
+            if (existing != null) {
+                if (selected.size() == 1) {
+                    player.sendMessage("§cMindestens ein Spielmodus muss für die Arena freigegeben bleiben.");
+                    openModeSetup(player, arenaId);
+                    return;
+                }
+                selected.remove(existing);
+            } else {
+                selected.add(modeId);
+            }
+            plugin.getArenaService().save(arena.withEnabledModes(selected));
+            player.sendMessage("§aSpielmodus-Freigabe wurde gespeichert.");
+            openModeSetup(player, arenaId);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cSpielmodus konnte nicht gespeichert werden: " + exception.getMessage());
+            openModeSetup(player, arenaId);
+        }
+    }
+
     /** Shows the actual readiness of every registered mode against this arena's saved layout. */
     private void openSetupReview(Player player, String arenaId) {
         try {
@@ -539,11 +617,13 @@ public final class ArenaManagementMenu implements Listener {
                             : "§aNicht geladen"),
                     "§7Standard-Spawn: " + (arena.spawnPoint("default").isPresent()
                             ? "§aGesetzt" : "§eOptional – Weltspawn wird verwendet"),
-                    "§7Jeder Modus wird anhand seiner Pflicht-Spawnpunkte geprüft."));
+                    "§7Nur freigegebene Modi werden anhand ihrer Pflicht-Spawnpunkte geprüft.",
+                    "§7Freigegebene Modi: §f" + (arena.enabledModeIds().isEmpty() ? "Alle" : arena.enabledModeIds().size())));
             int[] slots = {19, 21, 23, 25};
             int index = 0;
             boolean allReady = true;
             for (var factory : plugin.getGameModeRegistry().getAll()) {
+                if (!arena.supportsMode(factory.getId())) continue;
                 if (index >= slots.length) break;
                 var mode = factory.createSession();
                 ArenaValidation result = ArenaValidation.check(arena, mode, template.valid(), template.loaded());
@@ -712,14 +792,21 @@ public final class ArenaManagementMenu implements Listener {
             }
             if (slot == 14) { setSpawn(player, holder.arenaId, "default"); return; }
             if (slot == 16) { openTeamSetup(player, holder.arenaId); return; }
-            if (slot == 31) { openSetupReview(player, holder.arenaId); return; }
+            if (slot == 30) { openModeSetup(player, holder.arenaId); return; }
+            if (slot == 32) { openSetupReview(player, holder.arenaId); return; }
         } else if (holder.screen == Screen.TEAM_SETUP) {
             if (slot == 45) { openSetup(player, holder.arenaId); return; }
-            if (slot == 31) { openSetupReview(player, holder.arenaId); return; }
+            if (slot == 31) { openModeSetup(player, holder.arenaId); return; }
             if (slot == 49) { openTeamSetup(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String spawnName = holder.spawnActions.get(slot);
             if (spawnName != null) { setSpawn(player, holder.arenaId, spawnName); return; }
+        } else if (holder.screen == Screen.MODE_SETUP) {
+            if (slot == 45) { openSetup(player, holder.arenaId); return; }
+            if (slot == 49) { openModeSetup(player, holder.arenaId); return; }
+            if (slot == 53) { player.closeInventory(); return; }
+            String modeId = holder.entries.get(slot);
+            if (modeId != null) { toggleArenaMode(player, holder.arenaId, modeId); return; }
         } else if (holder.screen == Screen.REVIEW) {
             if (slot == 45) { openTeamSetup(player, holder.arenaId); return; }
             if (slot == 49) { openDetails(player, holder.arenaId); return; }
@@ -826,14 +913,14 @@ public final class ArenaManagementMenu implements Listener {
                     () -> new IllegalStateException("Arena nicht gefunden."));
             switch (pending.action()) {
                 case RENAME -> {
-                    plugin.getArenaService().save(new Arena(arena.id(), value, arena.worldName(), arena.spawnPoints()));
+                    plugin.getArenaService().save(new Arena(arena.id(), value, arena.worldName(), arena.spawnPoints(), arena.enabledModeIds()));
                     player.sendMessage("§aAnzeigename wurde geändert.");
                     openDetails(player, pending.arenaId());
                 }
                 case CHANGE_TEMPLATE -> {
                     var template = plugin.getMapManager().inspectTemplate(value);
                     if (!template.valid()) throw new IllegalArgumentException("Keine gültige Vorlage: " + template.status());
-                    plugin.getArenaService().save(new Arena(arena.id(), arena.displayName(), value));
+                    plugin.getArenaService().save(new Arena(arena.id(), arena.displayName(), value, java.util.Map.of(), arena.enabledModeIds()));
                     player.sendMessage("§aKartenvorlage geändert. §eAlle bisherigen Spawnpunkte wurden zurückgesetzt, da sie zur alten Karte gehörten.");
                     if (template.loaded()) player.sendMessage("§eDie neue Vorlagenwelt muss vor Spielstart entladen werden.");
                     openDetails(player, pending.arenaId());
@@ -904,7 +991,7 @@ public final class ArenaManagementMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, REVIEW, DETAILS, CONFIRM }
+    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, MODE_SETUP, REVIEW, DETAILS, CONFIRM }
     private enum InputAction { RENAME, CHANGE_TEMPLATE, DUPLICATE }
     private record PendingInput(String arenaId, InputAction action) { }
 
