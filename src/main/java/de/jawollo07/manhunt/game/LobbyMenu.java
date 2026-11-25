@@ -94,7 +94,7 @@ public final class LobbyMenu implements Listener {
                 "§7Offline-Spieler werden in der Lobby nicht mitgezählt."));
 
         Material readiness = enoughPlayers ? Material.LIME_CONCRETE : Material.YELLOW_CONCRETE;
-        inventory.setItem(13, item(readiness,
+        inventory.setItem(8, item(readiness,
                 enoughPlayers ? "§aBereit für den Spielstart" : "§eWarte auf weitere Spieler",
                 "§7Online: §f" + onlineCount + "§7/§f" + required + " §7benötigt",
                 game.getState() == GameState.COUNTDOWN
@@ -104,6 +104,8 @@ public final class LobbyMenu implements Listener {
                 game.getState() == GameState.COUNTDOWN && onlineCount < required
                         ? "§cDer Countdown wird bei zu wenigen Spielern pausiert."
                         : "§7kann der Countdown beginnen."));
+        inventory.setItem(7, item(Material.WRITABLE_BOOK, "§eRundenregeln",
+                modeRules(game).toArray(String[]::new)));
 
         int slot = 9;
         for (GamePlayer participant : game.getPlayers()) {
@@ -154,6 +156,66 @@ public final class LobbyMenu implements Listener {
                 teamLore(game).toArray(String[]::new)));
         inventory.setItem(REFRESH_SLOT, item(Material.CLOCK, "§eAktualisieren",
                 "§7Spielerliste und Status neu laden."));
+    }
+
+    private List<String> modeRules(Game game) {
+        String mode = game.getMode().getId().toLowerCase(java.util.Locale.ROOT);
+        String timeValue = game.getArena().modeSetting(mode, "time_limit_seconds", "0");
+        int configuredTime;
+        try { configuredTime = Integer.parseInt(timeValue); }
+        catch (NumberFormatException ignored) { configuredTime = 0; }
+        int seconds = configuredTime > 0 ? configuredTime : game.getSettings().timeLimitSeconds();
+        String time = seconds <= 0 ? "Kein Zeitlimit" : (seconds / 60) + " Minuten";
+        List<String> lines = new ArrayList<>();
+        lines.add("§7Zeitlimit: §f" + time);
+        switch (mode) {
+            case "assassin" -> {
+                String distribution = game.getArena().modeSetting(mode, "target_distribution", "cycle");
+                lines.add("§7Zielverteilung: §f" + (distribution.equalsIgnoreCase("random")
+                        ? "Zufällig" : "Kreisförmig"));
+                lines.add("§8Nach einem Kill erhältst du das Ziel deines Opfers.");
+                lines.add("§8Der letzte Assassine gewinnt.");
+            }
+            case "hitman" -> {
+                int count = game.getArena().modeIntSetting(mode, "hitman_count", 0);
+                lines.add("§7Hitmen: §f" + (count <= 0 ? "Automatisch" : count));
+                boolean extraction = game.getArena().modeBooleanSetting(mode, "extraction_enabled", true);
+                lines.add("§7Evakuierung: " + (extraction ? "§aAktiv" : "§cDeaktiviert"));
+                if (extraction) {
+                    lines.add("§7Evakuierungsradius: §f"
+                            + game.getArena().modeIntSetting(mode, "extraction_radius", 4) + " Blöcke");
+                    lines.add("§7Evakuierungspunkt: §f"
+                            + (game.getArena().spawnPoint("extraction").isPresent() ? "Gesetzt" : "Nicht gesetzt"));
+                }
+                lines.add("§8Hitmen eliminieren alle oder Überlebende entkommen.");
+            }
+            case "juggernaut" -> {
+                lines.add("§7Juggernaut-Leben: §f" + game.getArena().modeIntSetting(mode, "boss_health", 40) + " HP");
+                StringBuilder abilities = new StringBuilder();
+                for (String key : List.of("ability_slam", "ability_charge", "ability_roar", "ability_regeneration")) {
+                    if (game.getArena().modeBooleanSetting(mode, key, true)) {
+                        if (!abilities.isEmpty()) abilities.append(", ");
+                        abilities.append(switch (key) {
+                            case "ability_slam" -> "Slam";
+                            case "ability_charge" -> "Charge";
+                            case "ability_roar" -> "Roar";
+                            default -> "Regeneration";
+                        });
+                    }
+                }
+                lines.add("§7Fähigkeiten: §f" + (abilities.isEmpty() ? "Keine" : abilities));
+                lines.add("§8Jäger müssen den Juggernaut besiegen.");
+            }
+            case "infection" -> {
+                int initial = game.getArena().modeIntSetting(mode, "initial_infected", 0);
+                lines.add("§7Start-Infizierte: §f" + (initial <= 0 ? "Automatisch" : initial));
+                lines.add("§8Infizierte stecken Überlebende an.");
+                lines.add("§8Überlebende gewinnen, wenn sie die Zeit überstehen.");
+            }
+            default -> lines.add("§7Die Spielregeln werden vom Spielmodus bestimmt.");
+        }
+        lines.add("§8Arena: " + game.getArena().displayName());
+        return lines;
     }
 
     private String teamSummary(Game game) {
