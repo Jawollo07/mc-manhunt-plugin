@@ -104,10 +104,27 @@ public final class GameHudService {
         lines.add(ChatColor.DARK_GRAY + "----------------");
         long seconds = game.getStartedAt().map(start -> Duration.between(start, java.time.Instant.now()).getSeconds())
                 .orElse(0L);
-        lines.add(ChatColor.GOLD + "Zeit: " + ChatColor.WHITE
-                + String.format("%02d:%02d", seconds / 60, seconds % 60));
+        lines.add(ChatColor.GOLD + "Vergangen: " + ChatColor.WHITE
+                + formatTime(seconds));
+        int configuredLimit = game.getArena().modeIntSetting(
+                game.getMode().getId(), "time_limit_seconds", 0);
+        int timeLimit = configuredLimit > 0 ? configuredLimit : game.getSettings().timeLimitSeconds();
+        if (timeLimit > 0) {
+            long remaining = Math.max(0L, timeLimit - seconds);
+            lines.add(ChatColor.YELLOW + "Restzeit: " + ChatColor.WHITE + formatTime(remaining));
+        } else {
+            lines.add(ChatColor.YELLOW + "Zeitlimit: " + ChatColor.WHITE + "Unbegrenzt");
+        }
+        if ("juggernaut".equalsIgnoreCase(game.getMode().getId())) {
+            lines.add(ChatColor.RED + "Boss-Leben: " + ChatColor.WHITE
+                    + game.getArena().modeIntSetting("juggernaut", "boss_health", 40) + " HP");
+        }
 
         return lines;
+    }
+
+    private String formatTime(long seconds) {
+        return String.format("%02d:%02d", seconds / 60, seconds % 60);
     }
 
     private String roleLabel(String role) {
