@@ -57,6 +57,7 @@ public final class GameHudService {
             Player player = Bukkit.getPlayer(participant.getUniqueId());
             if (player == null || !player.isOnline()) continue;
             Scoreboard board = activeBoards.computeIfAbsent(player.getUniqueId(), ignored -> createBoard(player));
+            if (player.getScoreboard() != board) player.setScoreboard(board);
             List<String> playerLines = buildLines(game, participant);
             Objective objective = board.getObjective("manhunt");
             if (objective == null) continue;
