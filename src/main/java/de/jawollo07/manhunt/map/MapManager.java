@@ -191,13 +191,19 @@ public final class MapManager {
         requireServerThread();
         validateTemplateId(templateId);
         TemplateLocation location = resolveTemplate(templateId);
-        if (location == null || !isValidWorldFolder(location.folder())) {
+        if (location == null) {
             return new MapTemplate(templateId, false, getLoadedTemplateWorld(templateId) != null,
                     "Weltordner fehlt oder enthält keine gültige level.dat");
         }
-        boolean loaded = getLoadedTemplateWorld(templateId) != null;
-        return new MapTemplate(templateId, true, loaded,
-                loaded ? "Welt ist geladen – vor Spielstart entladen" : "Bereit");
+        return inspectTemplate(location);
+    }
+
+    private MapTemplate inspectTemplate(TemplateLocation location) {
+        boolean valid = isValidWorldFolder(location.folder());
+        boolean loaded = getLoadedTemplateWorld(location.id()) != null;
+        return new MapTemplate(location.id(), valid, loaded,
+                !valid ? "Weltordner fehlt oder enthält keine gültige level.dat"
+                        : loaded ? "Welt ist geladen – vor Spielstart entladen" : "Bereit");
     }
 
     public World loadTemplateForEditing(String templateId) throws IOException {
