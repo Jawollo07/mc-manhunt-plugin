@@ -115,12 +115,63 @@ public final class GameHudService {
         } else {
             lines.add(ChatColor.YELLOW + "Zeitlimit: " + ChatColor.WHITE + "Unbegrenzt");
         }
-        if ("juggernaut".equalsIgnoreCase(game.getMode().getId())) {
-            lines.add(ChatColor.RED + "Boss-Leben: " + ChatColor.WHITE
-                    + game.getArena().modeIntSetting("juggernaut", "boss_health", 40) + " HP");
-        }
-
+        addObjectiveLines(game, participant, lines);
         return lines;
+    }
+
+    private void addObjectiveLines(Game game, GamePlayer participant, List<String> lines) {
+        String mode = game.getMode().getId().toLowerCase(java.util.Locale.ROOT);
+        String role = game.getRoleManager().getRoleId(participant.getUniqueId()).orElse("");
+        switch (mode) {
+            case "hitman" -> {
+                if (role.equals("hitman")) {
+                    lines.add(ChatColor.RED + "Auftrag: " + ChatColor.WHITE + "Alle Überlebenden finden");
+                } else {
+                    lines.add(ChatColor.GREEN + "Auftrag: " + ChatColor.WHITE + "Überleben / entkommen");
+                    addExtractionDistance(game, participant, lines);
+                }
+            }
+            case "infection" -> lines.add(ChatColor.GREEN + "Ziel: " + ChatColor.WHITE
+                    + (role.equals("infected") ? "Alle infizieren" : "Zeit überstehen"));
+            case "juggernaut" -> {
+                GamePlayer bossParticipant = game.getPlayers().stream()
+                        .filter(candidate -> game.getRoleManager().getRoleId(candidate.getUniqueId())
+                                .orElse("").equals("juggernaut"))
+                        .findFirst().orElse(null);
+                if (bossParticipant != null) {
+                    Player boss = Bukkit.getPlayer(bossParticipant.getUniqueId());
+                    if (boss != null && boss.isOnline()) {
+                        lines.add(ChatColor.RED + "Boss: " + ChatColor.WHITE
+                                + Math.ceil(boss.getHealth()) + "/" + Math.ceil(boss.getMaxHealth()) + " HP");
+                    }
+                }
+                lines.add(ChatColor.YELLOW + "Ziel: " + ChatColor.WHITE
+                        + (role.equals("juggernaut") ? "Jäger besiegen" : "Juggernaut besiegen"));
+            }
+            case "assassin" -> lines.add(ChatColor.RED + "Ziel: " + ChatColor.WHITE + "Geheimes Ziel eliminieren");
+            default -> { }
+        }
+    }
+
+    private void addExtractionDistance(Game game, GamePlayer participant, List<String> lines) {
+        if (!game.getArena().modeBooleanSetting("hitman", "extraction_enabled", true)
+                || game.getArena().spawnPoint("extraction").isEmpty()
+                || game.getMapInstance().isEmpty()) return;
+        Player player = Bukkit.getPlayer(participant.getUniqueId());
+        if (player == null || !player.isOnline()) return;
+        try {
+            org.bukkit.World world = plugin.getMapManager().getWorld(game.getMapInstance().orElseThrow());
+            if (!player.getWorld().equals(world)) return;
+            org.bukkit.Location extraction = game.getArena().spawnPoint("extraction")
+                    .orElseThrow().toLocation(world);
+            long distance = Math.round(player.getLocation().distance(extraction));
+            int radius = Math.max(2, Math.min(12,
+                    game.getArena().modeIntSetting("hitman", "extraction_radius", 4)));
+            lines.add(ChatColor.AQUA + "Evakuierung: " + ChatColor.WHITE
+                    + distance + "m (" + radius + "m nötig)");
+        } catch (IllegalStateException ignored) {
+            // The HUD must never interrupt a round if its temporary map is being cleaned up.
+        }
     }
 
     private String formatTime(long seconds) {
