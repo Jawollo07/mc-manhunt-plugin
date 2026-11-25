@@ -53,16 +53,16 @@ public final class GameHudService {
             return;
         }
 
-        List<String> lines = buildLines(game);
         for (GamePlayer participant : game.getPlayers()) {
             Player player = Bukkit.getPlayer(participant.getUniqueId());
             if (player == null || !player.isOnline()) continue;
             Scoreboard board = activeBoards.computeIfAbsent(player.getUniqueId(), ignored -> createBoard(player));
+            List<String> playerLines = buildLines(game, participant);
             Objective objective = board.getObjective("manhunt");
             if (objective == null) continue;
             for (String entry : new ArrayList<>(board.getEntries())) board.resetScores(entry);
-            int score = lines.size();
-            for (String line : lines) objective.getScore(line).setScore(score--);
+            int score = playerLines.size();
+            for (String line : playerLines) objective.getScore(line).setScore(score--);
         }
     }
 
@@ -78,10 +78,14 @@ public final class GameHudService {
         return board;
     }
 
-    private List<String> buildLines(Game game) {
+    private List<String> buildLines(Game game, GamePlayer participant) {
         List<String> lines = new ArrayList<>();
         lines.add(ChatColor.GRAY + game.getMode().getDisplayName());
         lines.add(ChatColor.DARK_GRAY + "----------------");
+        Team ownTeam = game.getTeamManager().getTeamOf(participant.getUniqueId()).orElse(null);
+        String role = game.getRoleManager().getRoleId(participant.getUniqueId()).orElse("Spieler");
+        lines.add(ChatColor.YELLOW + "Rolle: " + ChatColor.WHITE + roleLabel(role));
+        if (ownTeam != null) lines.add(ChatColor.YELLOW + "Team: " + teamColor(ownTeam) + ownTeam.getName());
         for (Team team : game.getTeamManager().getTeams()) {
             long alive = team.getMembers().stream()
                     .filter(id -> game.getPlayer(id)
@@ -102,9 +106,19 @@ public final class GameHudService {
         lines.add(ChatColor.GOLD + "Zeit: " + ChatColor.WHITE
                 + String.format("%02d:%02d", seconds / 60, seconds % 60));
 
-        UUID ignored = null;
-        // A compact personal role/team line keeps the sidebar useful without mode-specific UI logic.
         return lines;
+    }
+
+    private String roleLabel(String role) {
+        return switch (role.toLowerCase(java.util.Locale.ROOT)) {
+            case "assassin" -> "Assassine";
+            case "hitman" -> "Hitman";
+            case "survivor" -> "Überlebender";
+            case "juggernaut" -> "Juggernaut";
+            case "hunter" -> "Jäger";
+            case "infected" -> "Infiziert";
+            default -> role;
+        };
     }
 
     private ChatColor teamColor(Team team) {
