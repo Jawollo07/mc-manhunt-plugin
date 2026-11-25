@@ -574,7 +574,8 @@ public final class ArenaManagementMenu implements Listener {
                         (enabled ? "§a" : "§7") + mode.getDisplayName(),
                         "§7ID: §f" + mode.getId(),
                         enabled ? "§aFür diese Arena freigegeben" : "§cFür diese Arena deaktiviert",
-                        "§eKlicken zum Umschalten"));
+                        "§eLinksklick: Freigabe umschalten",
+                        "§eRechtsklick: Modus-Einstellungen"));
             }
             inventory.setItem(31, item(Material.BOOK, "§eWeiter: Team-Spawnpunkte (" + selected.size() + " Modi)",
                     "§7Mindestens ein Spielmodus muss aktiv bleiben.",
@@ -586,6 +587,119 @@ public final class ArenaManagementMenu implements Listener {
         } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
             player.sendMessage("§cSpielmodus-Auswahl konnte nicht geladen werden: " + exception.getMessage());
             openSetup(player, arenaId);
+        }
+    }
+
+    private Map<String, List<String>> modeSettingOptions(String modeId) {
+        Map<String, List<String>> options = new LinkedHashMap<>();
+        options.put("time_limit_seconds", List.of("0", "300", "600", "900", "1200", "1800", "2400"));
+        switch (modeId.toLowerCase(Locale.ROOT)) {
+            case "assassin" -> options.put("target_distribution", List.of("cycle", "random"));
+            case "hitman" -> {
+                options.put("hitman_count", List.of("0", "1", "2", "3"));
+                options.put("extraction_enabled", List.of("true", "false"));
+            }
+            case "juggernaut" -> {
+                options.put("boss_health", List.of("20", "30", "40", "60"));
+                options.put("ability_slam", List.of("true", "false"));
+                options.put("ability_charge", List.of("true", "false"));
+                options.put("ability_roar", List.of("true", "false"));
+                options.put("ability_regeneration", List.of("true", "false"));
+            }
+            case "infection" -> options.put("initial_infected", List.of("0", "1", "2", "3"));
+            default -> { }
+        }
+        return options;
+    }
+
+    private String settingLabel(String key) {
+        return switch (key) {
+            case "time_limit_seconds" -> "Zeitlimit";
+            case "target_distribution" -> "Zielverteilung";
+            case "hitman_count" -> "Anzahl Hitmen";
+            case "extraction_enabled" -> "Evakuierung";
+            case "boss_health" -> "Juggernaut-Leben";
+            case "ability_slam" -> "Ground Slam";
+            case "ability_charge" -> "Charge";
+            case "ability_roar" -> "Roar";
+            case "ability_regeneration" -> "Regeneration";
+            case "initial_infected" -> "Start-Infizierte";
+            default -> key;
+        };
+    }
+
+    private String settingValueLabel(String key, String value) {
+        if (key.equals("time_limit_seconds")) {
+            int seconds = Integer.parseInt(value);
+            return seconds == 0 ? "Server-Standard" : (seconds / 60) + " Minuten";
+        }
+        if (key.equals("hitman_count") || key.equals("initial_infected"))
+            return value.equals("0") ? "Automatisch" : value;
+        if (key.equals("boss_health")) return value + " HP";
+        if (key.equals("target_distribution")) return value.equals("random") ? "Zufällig" : "Kreisförmig";
+        return value.equals("true") ? "Aktiv" : "Deaktiviert";
+    }
+
+    private void openModeSettings(Player player, String arenaId, String modeId) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            if (!arena.supportsMode(modeId)) throw new IllegalStateException("Modus ist nicht freigegeben.");
+            String name = plugin.getGameModeRegistry().get(modeId)
+                    .map(de.jawollo07.manhunt.modes.GameModeFactory::getDisplayName).orElse(modeId);
+            MenuHolder holder = new MenuHolder(Screen.MODE_SETTINGS, arena.id(), modeId);
+            Inventory inventory = inventory(holder, "ManHunt • " + name);
+            inventory.setItem(4, item(Material.COMPARATOR, "§eEinstellungen: " + name,
+                    "§7Klicke einen Eintrag an, um ihn zu ändern.",
+                    "§7Änderungen werden sofort gespeichert.",
+                    "§7Server-Standard nutzt die globale Rundendauer."));
+            int slot = 10;
+            for (Map.Entry<String, List<String>> entry : modeSettingOptions(modeId).entrySet()) {
+                String key = entry.getKey();
+                String fallback = switch (key) {
+                    case "time_limit_seconds" -> "0";
+                    case "target_distribution" -> "cycle";
+                    case "hitman_count", "initial_infected" -> "0";
+                    case "boss_health" -> "40";
+                    default -> "true";
+                };
+                holder.entries.put(slot, key);
+                inventory.setItem(slot++, item(Material.REPEATER, "§e" + settingLabel(key),
+                        "§7Aktuell: §f" + settingValueLabel(key, arena.modeSetting(modeId, key, fallback)),
+                        "§eKlicken zum Ändern"));
+            }
+            inventory.setItem(45, item(Material.ARROW, "§eZurück zur Modusauswahl"));
+            inventory.setItem(49, item(Material.SUNFLOWER, "§eAktualisieren"));
+            inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
+            player.openInventory(inventory);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cEinstellungen konnten nicht geladen werden: " + exception.getMessage());
+            openModeSetup(player, arenaId);
+        }
+    }
+
+    private void cycleModeSetting(Player player, String arenaId, String modeId, String key) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            List<String> options = modeSettingOptions(modeId).get(key);
+            if (options == null) throw new IllegalArgumentException("Unbekannte Einstellung.");
+            String fallback = switch (key) {
+                case "time_limit_seconds" -> "0";
+                case "target_distribution" -> "cycle";
+                case "hitman_count", "initial_infected" -> "0";
+                case "boss_health" -> "40";
+                default -> "true";
+            };
+            String current = arena.modeSetting(modeId, key, fallback);
+            int index = options.indexOf(current);
+            String next = options.get((index + 1 + options.size()) % options.size());
+            plugin.getArenaService().save(arena.withModeSetting(modeId, key, next));
+            player.sendMessage("§a" + settingLabel(key) + ": §f" + settingValueLabel(key, next));
+            openModeSettings(player, arenaId, modeId);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cEinstellung konnte nicht gespeichert werden: " + exception.getMessage());
+            openModeSettings(player, arenaId, modeId);
         }
     }
 
@@ -826,7 +940,17 @@ public final class ArenaManagementMenu implements Listener {
             if (slot == 49) { openModeSetup(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String modeId = holder.entries.get(slot);
-            if (modeId != null) { toggleArenaMode(player, holder.arenaId, modeId); return; }
+            if (modeId != null) {
+                if (event.getClick().isRightClick()) openModeSettings(player, holder.arenaId, modeId);
+                else toggleArenaMode(player, holder.arenaId, modeId);
+                return;
+            }
+        } else if (holder.screen == Screen.MODE_SETTINGS) {
+            if (slot == 45) { openModeSetup(player, holder.arenaId); return; }
+            if (slot == 49) { openModeSettings(player, holder.arenaId, holder.secondaryId); return; }
+            if (slot == 53) { player.closeInventory(); return; }
+            String key = holder.entries.get(slot);
+            if (key != null) { cycleModeSetting(player, holder.arenaId, holder.secondaryId, key); return; }
         } else if (holder.screen == Screen.REVIEW) {
             if (slot == 45) { openTeamSetup(player, holder.arenaId); return; }
             if (slot == 49) { openDetails(player, holder.arenaId); return; }
@@ -1011,7 +1135,7 @@ public final class ArenaManagementMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, MODE_SETUP, REVIEW, DETAILS, CONFIRM }
+    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, MODE_SETUP, MODE_SETTINGS, REVIEW, DETAILS, CONFIRM }
     private enum InputAction { RENAME, CHANGE_TEMPLATE, DUPLICATE }
     private record PendingInput(String arenaId, InputAction action) { }
 
