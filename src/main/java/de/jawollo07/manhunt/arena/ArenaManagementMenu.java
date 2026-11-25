@@ -616,7 +616,7 @@ public final class ArenaManagementMenu implements Listener {
     }
 
     private Map<String, List<String>> modeSettingOptions(String modeId) {
-        Map<String, List<String>> options = new LinkedHashMap<>();
+        Map<String, List<String>> options = new java.util.LinkedHashMap<>();
         options.put("time_limit_seconds", List.of("0", "300", "600", "900", "1200", "1800", "2400"));
         switch (modeId.toLowerCase(Locale.ROOT)) {
             case "assassin" -> options.put("target_distribution", List.of("cycle", "random"));
