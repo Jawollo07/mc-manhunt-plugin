@@ -29,6 +29,22 @@ class ArenaTest {
     }
 
     @Test
+    void copiesArenaIdentityWhilePreservingTemplateAndSpawnLayout() {
+        Arena original = new Arena("forest", "Forest", "minecraft:forest")
+                .withSpawnPoint(new ArenaSpawnPoint("default", 1, 64, 2, 90, 0))
+                .withSpawnPoint(new ArenaSpawnPoint("team:hunters:1", 10, 70, 20, 180, 0));
+
+        Arena copy = original.copyAs("forest_copy", "Forest (Kopie)");
+
+        assertEquals("forest_copy", copy.id());
+        assertEquals("Forest (Kopie)", copy.displayName());
+        assertEquals(original.worldName(), copy.worldName());
+        assertEquals(original.spawnPoints(), copy.spawnPoints());
+        assertNotSame(original.spawnPoints(), copy.spawnPoints());
+        assertEquals(original.spawnPoints(), original.copyAs("other", "Other").spawnPoints());
+    }
+
+    @Test
     void rejectsInvalidSpawnPointKeysAndNonFiniteCoordinates() {
         assertThrows(IllegalArgumentException.class,
                 () -> new Arena("forest", "Forest", "map")
