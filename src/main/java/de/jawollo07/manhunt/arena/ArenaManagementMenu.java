@@ -474,13 +474,6 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Gespeicherte Team-Spawnpunkte: §f" + teamSpawns,
                     "§7Es werden nur benötigte Teams angezeigt.",
                     "§eKlicken für die Team-Einrichtung"));
-            int enabledModes = arena.enabledModeIds().isEmpty()
-                    ? plugin.getGameModeRegistry().getAll().size() : arena.enabledModeIds().size();
-            inventory.setItem(30, item(Material.NAME_TAG,
-                    "§e5. Spielmodi freigeben",
-                    "§7Freigegebene Modi: §f" + enabledModes,
-                    "§7Eine Arena kann mehrere Modi unterstützen.",
-                    "§eKlicken zum Auswählen"));
             inventory.setItem(32, item(Material.BOOK,
                     "§e6. Abschlussprüfung",
                     "§7Prüft nur die für diese Arena freigegebenen Modi.",
@@ -583,10 +576,8 @@ public final class ArenaManagementMenu implements Listener {
                         enabled ? "§aFür diese Arena freigegeben" : "§cFür diese Arena deaktiviert",
                         "§eKlicken zum Umschalten"));
             }
-            inventory.setItem(31, item(Material.BOOK, "§e" + selected.size() + " Modi freigegeben",
+            inventory.setItem(31, item(Material.BOOK, "§eWeiter: Team-Spawnpunkte (" + selected.size() + " Modi)",
                     "§7Mindestens ein Spielmodus muss aktiv bleiben.",
-                    "§7Die Spawn-Prüfung berücksichtigt nur diese Modi."));
-            inventory.setItem(31, item(Material.BOOK, "§eWeiter: Team-Spawnpunkte",
                     "§7Nur Teams der freigegebenen Modi werden angezeigt."));
             inventory.setItem(45, item(Material.ARROW, "§eZurück zum Arena-Setup"));
             inventory.setItem(49, item(Material.SUNFLOWER, "§eAktualisieren"));
@@ -823,7 +814,7 @@ public final class ArenaManagementMenu implements Listener {
             if (slot == 30) { openTeamSetup(player, holder.arenaId); return; }
             if (slot == 32) { openSetupReview(player, holder.arenaId); return; }
         } else if (holder.screen == Screen.TEAM_SETUP) {
-            if (slot == 45) { openSetup(player, holder.arenaId); return; }
+            if (slot == 45) { openModeSetup(player, holder.arenaId); return; }
             if (slot == 31) { openSetupReview(player, holder.arenaId); return; }
             if (slot == 49) { openTeamSetup(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
@@ -831,6 +822,7 @@ public final class ArenaManagementMenu implements Listener {
             if (spawnName != null) { setSpawn(player, holder.arenaId, spawnName); return; }
         } else if (holder.screen == Screen.MODE_SETUP) {
             if (slot == 45) { openSetup(player, holder.arenaId); return; }
+            if (slot == 31) { openTeamSetup(player, holder.arenaId); return; }
             if (slot == 49) { openModeSetup(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String modeId = holder.entries.get(slot);
