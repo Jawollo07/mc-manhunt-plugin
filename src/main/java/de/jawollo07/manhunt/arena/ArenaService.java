@@ -30,6 +30,22 @@ public final class ArenaService {
         return repository.findAll();
     }
 
+    public Arena duplicate(String sourceId, String newId, String newDisplayName) throws SQLException {
+        validateIdentifier(sourceId, "source arena id");
+        validateIdentifier(newId, "new arena id");
+        if (newDisplayName == null || newDisplayName.isBlank()) {
+            throw new IllegalArgumentException("Arena display name must not be blank");
+        }
+        Arena source = repository.findById(sourceId)
+                .orElseThrow(() -> new IllegalArgumentException("Source arena not found: " + sourceId));
+        if (repository.findById(newId).isPresent()) {
+            throw new IllegalArgumentException("An arena with this ID already exists: " + newId);
+        }
+        Arena copy = source.copyAs(newId, newDisplayName);
+        save(copy);
+        return copy;
+    }
+
     public boolean delete(String id) throws SQLException {
         validateIdentifier(id, "arena id");
         return repository.delete(id);
