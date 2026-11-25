@@ -161,7 +161,7 @@ public final class ArenaManagementMenu implements Listener {
                         "§eRechtsklick: Position in Vorlagenwelt testen"));
             }
             inventory.setItem(45, item(Material.ARROW, "§eZurück"));
-            inventory.setItem(46, item(Material.COPY, "§aArena duplizieren",
+            inventory.setItem(46, item(Material.WRITABLE_BOOK, "§aArena duplizieren",
                     "§7Kopiert diese Arena inklusive",
                     "§7Kartenvorlage und aller Spawnpunkte.",
                     "§7Die Kopie erhält eine eigene Arena-ID."));
