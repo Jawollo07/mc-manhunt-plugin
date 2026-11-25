@@ -98,7 +98,9 @@ public final class ArenaManagementMenu implements Listener {
                         : template.loaded() ? Material.YELLOW_CONCRETE : Material.GRASS_BLOCK;
                 inventory.setItem(slot++, item(icon, (template.valid() ? "§a" : "§c") + template.id(),
                         "§7Status: " + statusColor(template) + template.status(),
-                        template.valid() ? "§7Als Arena registrieren/öffnen" : "§cNicht als Vorlage verwendbar"));
+                        "§7Letzte Änderung: §f" + template.lastModified(),
+                        "§7Ordner: §f" + template.folder(),
+                        template.valid() ? "§aKlicken für Vorschau & Import" : "§cNicht als Vorlage verwendbar"));
             }
             if (templates.isEmpty()) inventory.setItem(22, item(Material.BARRIER, "§cKeine Weltordner gefunden",
                     "§7Lege eine Minecraft-Welt in den Server-Weltordner."));
@@ -196,21 +198,31 @@ public final class ArenaManagementMenu implements Listener {
     private void openTemplateDetails(Player player, String templateId) {
         try {
             var template = plugin.getMapManager().inspectTemplate(templateId);
+            List<Arena> linkedArenas = plugin.getArenaService().findAll().stream()
+                    .filter(arena -> arena.worldName().equalsIgnoreCase(templateId))
+                    .toList();
             MenuHolder holder = new MenuHolder(Screen.TEMPLATE_DETAILS, templateId, null);
             Inventory inventory = inventory(holder, "ManHunt • Vorlage " + templateId);
             inventory.setItem(4, item(template.valid() ? Material.GRASS_BLOCK : Material.BARRIER,
                     "§e" + templateId,
                     "§7Status: " + statusColor(template) + template.status(),
-                    "§7Wird als Original bearbeitet; Spielrunden verwenden weiterhin Kopien.",
-                    "§cDie Originalvorlage niemals während einer laufenden Bearbeitung löschen."));
+                    "§7Zuletzt geändert: §f" + template.lastModified(),
+                    "§7Weltordner: §f" + template.folder(),
+                    "§7Verknüpfte Arenen: §f" + linkedArenas.size(),
+                    linkedArenas.isEmpty() ? "§eNoch keiner Arena zugeordnet" : "§7Arenen: §f"
+                            + linkedArenas.stream().map(Arena::id).limit(4)
+                            .collect(java.util.stream.Collectors.joining(", ")),
+                    "§7Original bleibt unverändert; Runden nutzen temporäre Kopien."));
             inventory.setItem(20, item(template.loaded() ? Material.ENDER_PEARL : Material.COMPASS,
                     template.loaded() ? "§aWelt betreten" : "§aVorlage laden & betreten",
                     "§7Lädt die Originalwelt, falls nötig.",
                     "§7Teleportiert dich zum Weltspawn.",
                     "§7Danach kannst du Spawnpunkte setzen."));
-            inventory.setItem(22, item(Material.CHEST, "§eAls Arena registrieren/öffnen",
-                    "§7Erstellt den Arena-Eintrag, falls er fehlt.",
-                    "§7Öffnet anschließend die Spawnpunkt-Verwaltung."));
+            inventory.setItem(22, item(Material.CHEST, "§aIn ManHunt importieren",
+                    "§7Registriert diese vorhandene Welt als Arena.",
+                    "§7Erstellt einen Arena-Eintrag, falls er fehlt.",
+                    "§7Die Originalwelt wird weder verschoben noch gelöscht.",
+                    "§7Anschließend Spawnpunkte verwalten."));
             if (plugin.getMapManager().isLoadedForEditing(templateId)) {
                 inventory.setItem(24, item(Material.REDSTONE_BLOCK, "§cVorlage entladen",
                         "§7Nur möglich, wenn sich keine Spieler",
