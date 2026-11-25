@@ -689,7 +689,6 @@ public final class ArenaManagementMenu implements Listener {
                     case "target_distribution" -> "cycle";
                     case "hitman_count", "initial_infected" -> "0";
                     case "boss_health" -> "40";
-                case "extraction_radius" -> "4";
                     case "extraction_radius" -> "4";
                     default -> "true";
                 };
@@ -719,6 +718,7 @@ public final class ArenaManagementMenu implements Listener {
                 case "target_distribution" -> "cycle";
                 case "hitman_count", "initial_infected" -> "0";
                 case "boss_health" -> "40";
+                case "extraction_radius" -> "4";
                 default -> "true";
             };
             String current = arena.modeSetting(modeId, key, fallback);
