@@ -622,13 +622,15 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Freigegebene Modi: §f" + (arena.enabledModeIds().isEmpty() ? "Alle" : arena.enabledModeIds().size())));
             int[] slots = {19, 21, 23, 25};
             int index = 0;
+            int checked = 0;
             boolean allReady = true;
             for (var factory : plugin.getGameModeRegistry().getAll()) {
                 if (!arena.supportsMode(factory.getId())) continue;
-                if (index >= slots.length) break;
                 var mode = factory.createSession();
                 ArenaValidation result = ArenaValidation.check(arena, mode, template.valid(), template.loaded());
                 allReady &= result.ready();
+                checked++;
+                if (index >= slots.length) continue;
                 List<String> lore = new java.util.ArrayList<>();
                 lore.add("§7Status: " + (result.ready() ? "§aBereit" : "§cNicht bereit"));
                 lore.add("§7Benötigte Team-Spawns: §f"
@@ -642,7 +644,7 @@ public final class ArenaManagementMenu implements Listener {
             }
             inventory.setItem(31, item(allReady ? Material.EMERALD_BLOCK : Material.YELLOW_CONCRETE,
                     allReady ? "§aAlle Modi sind startbereit" : "§eEs gibt noch offene Punkte",
-                    "§7" + index + " Spielmodi geprüft.",
+                    "§7" + checked + " Spielmodi geprüft." + (checked > slots.length ? " (erste vier angezeigt)" : ""),
                     "§7Eine Arena kann trotz offener Modi gespeichert bleiben.",
                     "§7Nur der ausgewählte Modus muss vor Spielstart bereit sein."));
             inventory.setItem(45, item(Material.ARROW, "§eZurück zum Team-Setup"));
