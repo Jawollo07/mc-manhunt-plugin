@@ -311,6 +311,12 @@ public final class ArenaManagementMenu implements Listener {
                 return;
             }
             Arena arena = plugin.getArenaService().find(templateId).orElse(null);
+            if (arena == null && templateId.startsWith("minecraft:")) {
+                String legacyId = templateId.substring("minecraft:".length());
+                arena = plugin.getArenaService().findAll().stream()
+                        .filter(existing -> existing.worldName().equalsIgnoreCase(legacyId))
+                        .findFirst().orElse(null);
+            }
             if (arena == null) {
                 String displayName = templateId.substring(templateId.lastIndexOf(':') + 1).replace('_', ' ').replace('-', ' ');
                 displayName = java.util.Arrays.stream(displayName.split("\\s+"))
@@ -318,7 +324,15 @@ public final class ArenaManagementMenu implements Listener {
                         .map(part -> part.substring(0, 1).toUpperCase(Locale.ROOT)
                                 + part.substring(1).toLowerCase(Locale.ROOT))
                         .collect(java.util.stream.Collectors.joining(" "));
-                arena = new Arena(templateId, displayName, templateId);
+                String arenaId = templateId.replace(':', '_').replace('/', '_');
+                if (arenaId.length() > 64) arenaId = arenaId.substring(0, 64);
+                String baseId = arenaId;
+                int suffix = 2;
+                while (plugin.getArenaService().find(arenaId).isPresent()) {
+                    String tail = "_" + suffix++;
+                    arenaId = baseId.substring(0, Math.min(baseId.length(), 64 - tail.length())) + tail;
+                }
+                arena = new Arena(arenaId, displayName, templateId);
                 plugin.getArenaService().save(arena);
                 player.sendMessage("§aArena §e" + displayName + " §awurde aus der Vorlage registriert.");
             }
