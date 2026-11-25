@@ -2,6 +2,8 @@ package de.jawollo07.manhunt.modes;
 
 import de.jawollo07.manhunt.game.Game;
 
+import java.util.List;
+
 /**
  * Defines mode-specific rules. Shared game lifecycle and infrastructure stay in the core.
  * Implementations are called from the server's main thread.
@@ -12,6 +14,9 @@ public interface GameMode {
 
     /** Minimum roster size required by this mode before its countdown may start. */
     default int getMinimumPlayers() { return 2; }
+
+    /** Spawn points this mode cannot run without. Most modes use the arena/world spawn fallback. */
+    default List<String> getRequiredArenaSpawnPoints() { return List.of(); }
 
     default void onPrepare(Game game) {}
     default void onStart(Game game) {}
