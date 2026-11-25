@@ -50,7 +50,7 @@ public record Arena(String id, String displayName, String worldName, Map<String,
     public static String normalizeSpawnKey(String name) {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("Spawn point name must not be blank");
         String normalized = name.trim().toLowerCase(java.util.Locale.ROOT);
-        if (!normalized.matches("[a-z0-9_-]+(?::[a-z0-9_-]+)?")) {
+        if (!normalized.matches("[a-z0-9_-]+(?::[a-z0-9_-]+)*")) {
             throw new IllegalArgumentException("Invalid spawn point name: " + name);
         }
         return normalized;
