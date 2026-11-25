@@ -7,6 +7,8 @@ import java.util.Optional;
 
 /** Validates arena definitions before they are persisted. */
 public final class ArenaService {
+    private static final String TEMPLATE_ID = "(?:[a-zA-Z0-9_.-]{1,48}|[a-z0-9_.-]{1,48}:[a-z0-9/._-]{1,48})";
+
     private final ArenaRepository repository;
 
     public ArenaService(ArenaRepository repository) {
@@ -34,7 +36,7 @@ public final class ArenaService {
     }
 
     private void validateTemplateIdentifier(String value) {
-        if (value == null || !value.matches("[a-zA-Z0-9_-]{1,48}")) {
+        if (value == null || !value.matches(TEMPLATE_ID)) {
             throw new IllegalArgumentException("Invalid map template id: " + value);
         }
     }
