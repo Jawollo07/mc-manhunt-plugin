@@ -42,6 +42,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
                 case "settemplate" -> setTemplate(sender, args);
                 case "list" -> list(sender);
                 case "create" -> create(sender, args);
+                case "duplicate" -> duplicate(sender, args);
                 case "delete" -> delete(sender, args);
                 case "info" -> info(sender, args);
                 case "setspawn" -> setSpawn(sender, args);
@@ -84,6 +85,18 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         plugin.getArenaService().save(arena);
         sender.sendMessage("§aArena §e" + arena.id() + " §awurde gespeichert.");
         if (template.loaded()) sender.sendMessage("§eHinweis: Die Vorlagenwelt ist geladen und muss vor dem Spielstart entladen werden.");
+    }
+
+    private void duplicate(CommandSender sender, String[] args) throws SQLException {
+        requireArgs(args, 4, "Verwendung: /manhunt arena duplicate <quelle> <neue-id> [Anzeigename]");
+        Arena source = plugin.getArenaService().find(args[2]).orElseThrow(
+                () -> new IllegalArgumentException("Arena nicht gefunden: " + args[2]));
+        String displayName = args.length > 4
+                ? String.join(" ", java.util.Arrays.copyOfRange(args, 4, args.length))
+                : source.displayName() + " (Kopie)";
+        Arena copy = plugin.getArenaService().duplicate(source.id(), args[3], displayName);
+        sender.sendMessage("§aArena §e" + source.id() + " §awurde als §e" + copy.id()
+                + " §adupliziert. §7(" + copy.spawnPoints().size() + " Spawnpunkte übernommen)");
     }
 
     private void delete(CommandSender sender, String[] args) throws SQLException {
@@ -341,6 +354,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/" + label + " arena settemplate <id> <template>");
         sender.sendMessage("§e/" + label + " arena list");
         sender.sendMessage("§e/" + label + " arena create <id> <template> <Anzeigename>");
+        sender.sendMessage("§e/" + label + " arena duplicate <quelle> <neue-id> [Anzeigename]");
         sender.sendMessage("§e/" + label + " arena delete <id>");
         sender.sendMessage("§e/" + label + " arena info <id>");
         sender.sendMessage("§e/" + label + " arena setspawn <id> <default|team:name>");
@@ -356,7 +370,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         if (!sender.hasPermission("manhunt.admin")) return List.of();
         if (args.length == 1) return filter(List.of("arena"), args[0]);
         if (args.length == 2 && args[0].equalsIgnoreCase("arena")) {
-            return filter(List.of("gui", "edit", "leave", "templates", "list", "create", "delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn", "spawn"), args[1]);
+            return filter(List.of("gui", "edit", "leave", "templates", "list", "create", "duplicate", "delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn", "spawn"), args[1]);
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("spawn")) {
@@ -378,7 +392,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
             }
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("arena")
-                && List.of("delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn").contains(args[1].toLowerCase(Locale.ROOT))) {
+                && List.of("delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn", "duplicate").contains(args[1].toLowerCase(Locale.ROOT))) {
             try {
                 return filter(plugin.getArenaService().findAll().stream().map(Arena::id).toList(), args[2]);
             } catch (SQLException exception) {
