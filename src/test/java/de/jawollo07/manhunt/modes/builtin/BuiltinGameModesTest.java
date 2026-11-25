@@ -42,6 +42,17 @@ class BuiltinGameModesTest {
     }
 
     @Test
+    void builtInModesDeclareEveryTeamSpawnTheyNeed() {
+        GameModeRegistry registry = new GameModeRegistry();
+        BuiltinGameModes.factories(null).forEach(registry::register);
+
+        assertEquals(List.of("team:assassins"), registry.createSession("assassin").orElseThrow().getRequiredArenaSpawnPoints());
+        assertEquals(List.of("team:hitmen", "team:survivors"), registry.createSession("hitman").orElseThrow().getRequiredArenaSpawnPoints());
+        assertEquals(List.of("team:juggernaut", "team:hunters"), registry.createSession("juggernaut").orElseThrow().getRequiredArenaSpawnPoints());
+        assertEquals(List.of("team:infected", "team:survivors"), registry.createSession("infection").orElseThrow().getRequiredArenaSpawnPoints());
+    }
+
+    @Test
     void modeIdsAreCaseInsensitive() {
         GameModeRegistry registry = new GameModeRegistry();
         BuiltinGameModes.factories(null).forEach(registry::register);
