@@ -36,6 +36,18 @@ class ArenaValidationTest {
         assertTrue(result.warnings().stream().anyMatch(message -> message.contains("Weltspawn")));
     }
 
+
+    @Test
+    void acceptsAutomaticallyNumberedTeamSpawnPointsForRequiredTeam() {
+        Arena arena = new Arena("forest", "Forest", "forest")
+                .withSpawnPoint(new ArenaSpawnPoint("team:hunters:1", 0, 64, 0, 0, 0))
+                .withSpawnPoint(new ArenaSpawnPoint("team:hunters:2", 4, 64, 0, 0, 0));
+        ArenaValidation result = ArenaValidation.check(arena, modeWithRequiredSpawn("team:hunters"), true, false);
+
+        assertTrue(result.ready());
+        assertTrue(result.warnings().stream().anyMatch(message -> message.contains("Weltspawn")));
+    }
+
     @Test
     void rejectsInvalidOrAlreadyLoadedTemplates() {
         Arena arena = new Arena("forest", "Forest", "forest");
