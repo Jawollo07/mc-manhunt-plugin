@@ -248,7 +248,8 @@ public final class MapManager {
             NamespacedKey key = parseDimensionKey(templateId);
             return key == null ? null : Bukkit.getWorld(key);
         }
-        return Bukkit.getWorld(templateId);
+        World legacy = Bukkit.getWorld(templateId);
+        return legacy != null ? legacy : Bukkit.getWorld(NamespacedKey.minecraft(templateId.toLowerCase(Locale.ROOT)));
     }
 
     public boolean isTemplateWorld(World world, String templateId) {
@@ -258,7 +259,8 @@ public final class MapManager {
             NamespacedKey key = parseDimensionKey(templateId);
             return key != null && world.getKey().equals(key);
         }
-        return world.getName().equalsIgnoreCase(templateId);
+        return world.getName().equalsIgnoreCase(templateId)
+                || world.getKey().equals(NamespacedKey.minecraft(templateId.toLowerCase(Locale.ROOT)));
     }
 
     public int getActiveInstanceCount() {
