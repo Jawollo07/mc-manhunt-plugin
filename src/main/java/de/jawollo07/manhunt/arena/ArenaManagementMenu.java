@@ -145,7 +145,9 @@ public final class ArenaManagementMenu implements Listener {
         catch (IOException | IllegalArgumentException exception) { return 0; }
     }
 
-    private void openDetails(Player player, String arenaId) {
+    private void openDetails(Player player, String arenaId) { openDetails(player, arenaId, 0); }
+
+    private void openDetails(Player player, String arenaId, int page) {
         try {
             Arena arena = plugin.getArenaService().find(arenaId).orElse(null);
             if (arena == null) {
@@ -154,7 +156,11 @@ public final class ArenaManagementMenu implements Listener {
                 return;
             }
             var template = plugin.getMapManager().inspectTemplate(arena.worldName());
-            MenuHolder holder = new MenuHolder(Screen.DETAILS, arena.id(), null);
+            List<ArenaSpawnPoint> spawnPoints = arena.spawnPoints().values().stream()
+                    .sorted(java.util.Comparator.comparing(ArenaSpawnPoint::name, String.CASE_INSENSITIVE_ORDER)).toList();
+            int spawnPages = Math.max(1, (spawnPoints.size() + 15) / 16);
+            int currentPage = Math.max(0, Math.min(page, spawnPages - 1));
+            MenuHolder holder = new MenuHolder(Screen.DETAILS, arena.id(), null, currentPage);
             Inventory inventory = inventory(holder, "ManHunt • " + arena.displayName());
             inventory.setItem(4, item(template.valid() ? Material.MAP : Material.BARRIER,
                     "§e" + arena.displayName(),
@@ -188,9 +194,14 @@ public final class ArenaManagementMenu implements Listener {
                         "§7Du musst dich in der Vorlagenwelt befinden."));
                 holder.spawnActions.put(10 + i, name);
             }
+            inventory.setItem(22, item(template.valid() ? Material.LIME_CONCRETE : Material.RED_CONCRETE,
+                    template.valid() ? "§aVorlage grundsätzlich verwendbar" : "§cVorlage nicht bereit",
+                    "§7Gespeicherte Spawnpunkte: §f" + spawnPoints.size(),
+                    "§7Team-Spawns: §f" + spawnPoints.stream().filter(point -> point.name().startsWith("team:")).count(),
+                    "§7Standard-Spawn: " + (arena.spawnPoint("default").isPresent() ? "§aGesetzt" : "§eNicht gesetzt"),
+                    template.loaded() ? "§eVorlage ist geladen – vor Spielstart entladen." : "§aVorlage ist nicht geladen."));
             int slot = 28;
-            for (ArenaSpawnPoint point : arena.spawnPoints().values()) {
-                if (slot > 43) break;
+            for (ArenaSpawnPoint point : spawnPoints.subList(currentPage * 16, Math.min(currentPage * 16 + 16, spawnPoints.size()))) {
                 holder.spawnEntries.put(slot, point.name());
                 inventory.setItem(slot++, item(Material.ARMOR_STAND, "§b" + point.name(),
                         String.format(Locale.ROOT, "§7X: §f%.2f §7Y: §f%.2f §7Z: §f%.2f",
@@ -215,6 +226,8 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Lädt die Kartenvorlage bei Bedarf.",
                     "§7Teleportiert dich direkt zum Weltspawn.",
                     "§7Danach kannst du Spawnpunkte mit einem Klick setzen."));
+            if (currentPage > 0) inventory.setItem(51, item(Material.ARROW, "§eVorherige Spawnpunkt-Seite"));
+            if (currentPage + 1 < spawnPages) inventory.setItem(52, item(Material.ARROW, "§eNächste Spawnpunkt-Seite"));
             inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
             player.openInventory(inventory);
         } catch (SQLException | IllegalArgumentException exception) {
@@ -511,6 +524,8 @@ public final class ArenaManagementMenu implements Listener {
                 return;
             }
         } else if (holder.screen == Screen.DETAILS) {
+            if (slot == 51) { openDetails(player, holder.arenaId, holder.page - 1); return; }
+            if (slot == 52) { openDetails(player, holder.arenaId, holder.page + 1); return; }
             if (slot == 45) { openArenaList(player); return; }
             if (slot == 46) {
                 pendingInputs.put(player.getUniqueId(), new PendingInput(holder.arenaId, InputAction.DUPLICATE));
