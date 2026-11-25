@@ -49,6 +49,17 @@ class ArenaValidationTest {
     }
 
     @Test
+    void rejectsModesThatAreNotEnabledForArena() {
+        Arena arena = new Arena("forest", "Forest", "forest")
+                .withEnabledModes(java.util.Set.of("infection"));
+
+        ArenaValidation result = ArenaValidation.check(arena, modeWithRequiredSpawn("default"), true, false);
+
+        assertFalse(result.ready());
+        assertTrue(result.errors().stream().anyMatch(message -> message.contains("nicht freigegeben")));
+    }
+
+    @Test
     void rejectsInvalidOrAlreadyLoadedTemplates() {
         Arena arena = new Arena("forest", "Forest", "forest");
         GameMode mode = modeWithRequiredSpawn("default");
