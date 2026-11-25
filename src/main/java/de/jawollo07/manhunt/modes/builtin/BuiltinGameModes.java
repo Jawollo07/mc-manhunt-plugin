@@ -229,28 +229,27 @@ public final class BuiltinGameModes {
 
         @Override public void onPlayerDeath(Game game, GamePlayer victim, UUID killerId) {
             if (victim.isEliminated()) return;
-            UUID nextTarget = targets.remove(victim.getUniqueId());
+            UUID inheritedTarget = targets.remove(victim.getUniqueId());
             eliminate(game, victim);
-            if (killerId != null && !killerId.equals(victim.getUniqueId())
-                    && game.getPlayer(killerId).filter(p -> p.getStatus() == PlayerStatus.PLAYING).isPresent()) {
-                if (nextTarget == null) {
-                    targets.remove(killerId);
-                } else {
-                    targets.put(killerId, nextTarget);
-                }
+
+            List<UUID> orphanedHunters = targets.entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(victim.getUniqueId()))
+                    .map(Map.Entry::getKey).toList();
+            orphanedHunters.forEach(targets::remove);
+
+            boolean validKiller = killerId != null && !killerId.equals(victim.getUniqueId())
+                    && game.getPlayer(killerId).filter(p -> p.getStatus() == PlayerStatus.PLAYING).isPresent();
+            if (validKiller) {
                 game.getRoleManager().assign(killerId, "assassin");
-                Player killer = Bukkit.getPlayer(killerId);
-                if (killer != null) {
-                    String nextName = nextTarget == null ? "Kein weiteres Ziel" :
-                            java.util.Optional.ofNullable(Bukkit.getPlayer(nextTarget))
-                                    .map(Player::getName)
-                                    .orElseGet(() -> {
-                                        String offlineName = Bukkit.getOfflinePlayer(nextTarget).getName();
-                                        return offlineName == null ? nextTarget.toString().substring(0, 8) : offlineName;
-                                    });
-                    killer.sendMessage("§aNeues Ziel: §e" + nextName);
-                }
+                setTarget(game, killerId, inheritedTarget, "§aNeues Ziel");
             }
+
+            for (UUID orphanedHunter : orphanedHunters) {
+                if (validKiller && orphanedHunter.equals(killerId)) continue;
+                setTarget(game, orphanedHunter, validKiller ? null : inheritedTarget,
+                        "§eDein bisheriges Ziel ist ausgeschieden. Neues Ziel");
+            }
+
             List<UUID> alive = activePlayers(game);
             if (alive.size() <= 1) finish(game, GameOutcome.VICTORY, alive, "Letzter Assassine übrig");
         }
@@ -258,26 +257,39 @@ public final class BuiltinGameModes {
         @Override public void onPlayerQuit(Game game, GamePlayer quitter) {
             UUID leavingId = quitter.getUniqueId();
             UUID inheritedTarget = targets.remove(leavingId);
-            UUID previousHunter = targets.entrySet().stream()
+            List<UUID> orphanedHunters = targets.entrySet().stream()
                     .filter(entry -> entry.getValue().equals(leavingId))
-                    .map(Map.Entry::getKey).findFirst().orElse(null);
-            if (previousHunter != null) {
-                if (inheritedTarget == null || previousHunter.equals(inheritedTarget)) {
-                    targets.remove(previousHunter);
-                } else {
-                    targets.put(previousHunter, inheritedTarget);
-                    Player hunter = Bukkit.getPlayer(previousHunter);
-                    if (hunter != null) {
-                        String name = java.util.Optional.ofNullable(Bukkit.getPlayer(inheritedTarget))
-                                .map(Player::getName)
-                                .orElseGet(() -> java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(inheritedTarget).getName())
-                                        .orElse(inheritedTarget.toString().substring(0, 8)));
-                        hunter.sendMessage("§eDein Ziel hat die Runde verlassen. Neues Ziel: §c" + name);
-                    }
-                }
+                    .map(Map.Entry::getKey).toList();
+            orphanedHunters.forEach(targets::remove);
+            for (UUID hunterId : orphanedHunters) {
+                setTarget(game, hunterId, inheritedTarget, "§eDein Ziel hat die Runde verlassen. Neues Ziel");
             }
             List<UUID> alive = activePlayers(game);
             if (alive.size() <= 1) finish(game, GameOutcome.VICTORY, alive, "Letzter Assassine übrig");
+        }
+
+        private void setTarget(Game game, UUID hunterId, UUID preferredTarget, String message) {
+            List<UUID> candidates = activePlayers(game).stream()
+                    .filter(id -> !id.equals(hunterId)).collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+            UUID target = preferredTarget != null && candidates.contains(preferredTarget)
+                    ? preferredTarget : null;
+            if (target == null && !candidates.isEmpty()) {
+                Collections.shuffle(candidates);
+                target = candidates.get(0);
+            }
+            if (target == null) {
+                targets.remove(hunterId);
+                return;
+            }
+            targets.put(hunterId, target);
+            Player hunter = Bukkit.getPlayer(hunterId);
+            if (hunter != null) {
+                String name = java.util.Optional.ofNullable(Bukkit.getPlayer(target))
+                        .map(Player::getName)
+                        .orElseGet(() -> java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(target).getName())
+                                .orElse(target.toString().substring(0, 8)));
+                hunter.sendMessage(message + ": §c" + name);
+            }
         }
 
         @Override public void onTick(Game game, long elapsedSeconds) {
