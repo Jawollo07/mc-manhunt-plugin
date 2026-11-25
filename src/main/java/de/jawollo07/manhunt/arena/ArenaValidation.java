@@ -30,6 +30,7 @@ public record ArenaValidation(List<String> errors, List<String> warnings) {
 
         if (!templateValid) errors.add("Die Kartenvorlage ist ungültig oder unvollständig.");
         if (templateLoaded) errors.add("Die Kartenvorlage ist noch geladen und kann nicht kopiert werden.");
+        if (!arena.supportsMode(mode.getId())) errors.add("Dieser Spielmodus ist für die Arena nicht freigegeben.");
 
         for (String required : mode.getRequiredArenaSpawnPoints()) {
             if (!hasSpawnPoint(arena, required)) {
