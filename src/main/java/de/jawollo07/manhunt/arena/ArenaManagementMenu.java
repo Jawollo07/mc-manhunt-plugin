@@ -236,7 +236,7 @@ public final class ArenaManagementMenu implements Listener {
             inventory.setItem(49, item(Material.SUNFLOWER, "§eAktualisieren"));
             inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
             player.openInventory(inventory);
-        } catch (IllegalArgumentException exception) {
+        } catch (SQLException | IllegalArgumentException exception) {
             player.sendMessage("§cVorlage konnte nicht geöffnet werden: " + exception.getMessage());
             openTemplates(player);
         }
