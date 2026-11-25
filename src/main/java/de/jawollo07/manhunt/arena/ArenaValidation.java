@@ -10,10 +10,7 @@ import java.util.Objects;
 /** Mode-aware arena checks. Optional spawn points improve layouts but never block casual rounds. */
 public record ArenaValidation(List<String> errors, List<String> warnings) {
     private static final Map<String, List<String>> RECOMMENDED = Map.of(
-            "assassin", List.of("team:assassins"),
-            "hitman", List.of("team:hitmen", "team:survivors", "extraction"),
-            "juggernaut", List.of("team:juggernaut", "team:hunters"),
-            "infection", List.of("team:infected", "team:survivors")
+            "hitman", List.of("extraction")
     );
 
     public ArenaValidation {
