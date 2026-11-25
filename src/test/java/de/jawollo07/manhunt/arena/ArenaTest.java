@@ -45,6 +45,18 @@ class ArenaTest {
     }
 
     @Test
+    void restrictsArenaToSelectedModesAndCopiesThatSelection() {
+        Arena arena = new Arena("forest", "Forest", "map")
+                .withEnabledModes(java.util.Set.of("assassin", "infection"));
+
+        assertTrue(arena.supportsMode("ASSASSIN"));
+        assertTrue(arena.supportsMode("infection"));
+        assertFalse(arena.supportsMode("hitman"));
+        assertEquals(arena.enabledModeIds(), arena.copyAs("copy", "Copy").enabledModeIds());
+        assertTrue(new Arena("legacy", "Legacy", "map").supportsMode("any-mode"));
+    }
+
+    @Test
     void rejectsInvalidSpawnPointKeysAndNonFiniteCoordinates() {
         assertThrows(IllegalArgumentException.class,
                 () -> new Arena("forest", "Forest", "map")
