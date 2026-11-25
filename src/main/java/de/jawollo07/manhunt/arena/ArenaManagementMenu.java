@@ -103,7 +103,7 @@ public final class ArenaManagementMenu implements Listener {
                         "§7Status: " + statusColor(template) + template.status(),
                         "§7Letzte Änderung: §f" + template.lastModified(),
                         "§7Ordner: §f" + template.folder(),
-                        template.valid() ? "§aKlicken für Vorschau & Import" : "§cNicht als Vorlage verwendbar"));
+                        template.valid() ? "§aKlicken für Details & Arena-Erstellung" : "§cNicht als Vorlage verwendbar"));
             }
             if (templates.isEmpty()) inventory.setItem(22, item(Material.BARRIER, "§cKeine Weltordner gefunden",
                     "§7Lege eine Minecraft-Welt in den Server-Weltordner."));
@@ -187,6 +187,10 @@ public final class ArenaManagementMenu implements Listener {
             inventory.setItem(49, item(Material.TNT, "§cArena löschen",
                     "§7Entfernt nur den Arena-Eintrag,",
                     "§7niemals den Vorlagen-Weltordner."));
+            inventory.setItem(50, item(Material.ENDER_PEARL, "§aVorlagenwelt betreten",
+                    "§7Lädt die Kartenvorlage bei Bedarf.",
+                    "§7Teleportiert dich direkt zum Weltspawn.",
+                    "§7Danach kannst du Spawnpunkte mit einem Klick setzen."));
             inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
             player.openInventory(inventory);
         } catch (SQLException | IllegalArgumentException exception) {
@@ -496,6 +500,15 @@ public final class ArenaManagementMenu implements Listener {
                 return;
             }
             if (slot == 49) { openConfirm(player, holder.arenaId, null); return; }
+            if (slot == 50) {
+                try {
+                    Arena arena = plugin.getArenaService().find(holder.arenaId).orElseThrow();
+                    enterTemplateForEditing(player, arena.worldName());
+                } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+                    player.sendMessage("§cVorlagenwelt konnte nicht geöffnet werden: " + exception.getMessage());
+                }
+                return;
+            }
             if (slot == 53) { player.closeInventory(); return; }
             String spawnName = holder.spawnActions.get(slot);
             if (spawnName != null) { setSpawn(player, holder.arenaId, spawnName); return; }
