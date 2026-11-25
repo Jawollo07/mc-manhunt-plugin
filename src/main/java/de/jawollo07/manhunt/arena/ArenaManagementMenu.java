@@ -46,14 +46,19 @@ public final class ArenaManagementMenu implements Listener {
         openArenaList(player);
     }
 
-    private void openArenaList(Player player) {
-        MenuHolder holder = new MenuHolder(Screen.ARENAS, null, null);
-        Inventory inventory = inventory(holder, "ManHunt • Arenen");
+    private void openArenaList(Player player) { openArenaList(player, 0); }
+
+    private void openArenaList(Player player, int page) {
+        MenuHolder holder = new MenuHolder(Screen.ARENAS, null, null, page);
+        Inventory inventory = inventory(holder, "ManHunt • Arenen (" + (page + 1) + ")");
         try {
-            List<Arena> arenas = plugin.getArenaService().findAll();
+            List<Arena> arenas = plugin.getArenaService().findAll().stream()
+                    .sorted(java.util.Comparator.comparing(Arena::displayName, String.CASE_INSENSITIVE_ORDER)).toList();
+            int pageCount = Math.max(1, (arenas.size() + 33) / 34);
+            int start = Math.min(page, pageCount - 1) * 34;
+            holder.page = Math.min(page, pageCount - 1);
             int slot = 10;
-            for (Arena arena : arenas) {
-                if (slot > 43) break;
+            for (Arena arena : arenas.subList(start, Math.min(start + 34, arenas.size()))) {
                 holder.entries.put(slot, arena.id());
                 var template = plugin.getMapManager().inspectTemplate(arena.worldName());
                 Material icon = !template.valid() ? Material.BARRIER
@@ -83,19 +88,26 @@ public final class ArenaManagementMenu implements Listener {
             inventory.setItem(47, item(Material.OAK_DOOR, "§eVorlage verlassen",
                     "§7Zurück zum vorherigen Standort", "§7und die Vorlage sicher entladen."));
         }
+        if (holder.page > 0) inventory.setItem(48, item(Material.ARROW, "§eVorherige Seite"));
         inventory.setItem(49, item(Material.SUNFLOWER, "§eAktualisieren"));
+        if (holder.page + 1 < Math.max(1, (countArenas() + 33) / 34)) inventory.setItem(50, item(Material.ARROW, "§eNächste Seite"));
         inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
         player.openInventory(inventory);
     }
 
-    private void openTemplates(Player player) {
-        MenuHolder holder = new MenuHolder(Screen.TEMPLATES, null, null);
-        Inventory inventory = inventory(holder, "ManHunt • Kartenvorlagen");
+    private void openTemplates(Player player) { openTemplates(player, 0); }
+
+    private void openTemplates(Player player, int page) {
+        MenuHolder holder = new MenuHolder(Screen.TEMPLATES, null, null, page);
+        Inventory inventory = inventory(holder, "ManHunt • Kartenvorlagen (" + (page + 1) + ")");
         try {
-            List<de.jawollo07.manhunt.map.MapTemplate> templates = plugin.getMapManager().listTemplates();
+            List<de.jawollo07.manhunt.map.MapTemplate> templates = plugin.getMapManager().listTemplates().stream()
+                    .sorted(java.util.Comparator.comparing(de.jawollo07.manhunt.map.MapTemplate::id, String.CASE_INSENSITIVE_ORDER)).toList();
+            int pageCount = Math.max(1, (templates.size() + 33) / 34);
+            int start = Math.min(page, pageCount - 1) * 34;
+            holder.page = Math.min(page, pageCount - 1);
             int slot = 10;
-            for (var template : templates) {
-                if (slot > 43) break;
+            for (var template : templates.subList(start, Math.min(start + 34, templates.size()))) {
                 holder.entries.put(slot, template.id());
                 Material icon = !template.valid() ? Material.BARRIER
                         : template.loaded() ? Material.YELLOW_CONCRETE : Material.GRASS_BLOCK;
@@ -116,9 +128,21 @@ public final class ArenaManagementMenu implements Listener {
             inventory.setItem(47, item(Material.OAK_DOOR, "§eVorlage verlassen",
                     "§7Zurück zum vorherigen Standort", "§7und die Vorlage sicher entladen."));
         }
+        if (holder.page > 0) inventory.setItem(48, item(Material.ARROW, "§eVorherige Seite"));
         inventory.setItem(49, item(Material.SUNFLOWER, "§eErneut scannen"));
+        if (holder.page + 1 < Math.max(1, (countTemplates() + 33) / 34)) inventory.setItem(50, item(Material.ARROW, "§eNächste Seite"));
         inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
         player.openInventory(inventory);
+    }
+
+    private int countArenas() {
+        try { return plugin.getArenaService().findAll().size(); }
+        catch (SQLException exception) { return 0; }
+    }
+
+    private int countTemplates() {
+        try { return plugin.getMapManager().listTemplates().size(); }
+        catch (IOException | IllegalArgumentException exception) { return 0; }
     }
 
     private void openDetails(Player player, String arenaId) {
@@ -452,6 +476,8 @@ public final class ArenaManagementMenu implements Listener {
         int slot = event.getRawSlot();
 
         if (holder.screen == Screen.ARENAS) {
+            if (slot == 48) { openArenaList(player, holder.page - 1); return; }
+            if (slot == 50) { openArenaList(player, holder.page + 1); return; }
             if (slot == 45 || slot == 46) { openTemplates(player); return; }
             if (slot == 47 && editingReturnLocations.containsKey(player.getUniqueId())) { leaveTemplateEditing(player); return; }
             if (slot == 49) { openArenaList(player); return; }
@@ -459,6 +485,8 @@ public final class ArenaManagementMenu implements Listener {
             String id = holder.entries.get(slot);
             if (id != null) openDetails(player, id);
         } else if (holder.screen == Screen.TEMPLATES) {
+            if (slot == 48) { openTemplates(player, holder.page - 1); return; }
+            if (slot == 50) { openTemplates(player, holder.page + 1); return; }
             if (slot == 45) { openArenaList(player); return; }
             if (slot == 47 && editingReturnLocations.containsKey(player.getUniqueId())) { leaveTemplateEditing(player); return; }
             if (slot == 49) { openTemplates(player); return; }
@@ -650,11 +678,17 @@ public final class ArenaManagementMenu implements Listener {
         private final Map<Integer, String> spawnActions = new HashMap<>();
         private final Map<Integer, String> spawnEntries = new HashMap<>();
         private Inventory inventory;
+        private int page;
 
         private MenuHolder(Screen screen, String arenaId, String secondaryId) {
+            this(screen, arenaId, secondaryId, 0);
+        }
+
+        private MenuHolder(Screen screen, String arenaId, String secondaryId, int page) {
             this.screen = screen;
             this.arenaId = arenaId;
             this.secondaryId = secondaryId;
+            this.page = Math.max(0, page);
         }
 
         @Override public Inventory getInventory() { return inventory; }
