@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public final class AdminMenu implements Listener {
     private static final int SIZE = 54;
@@ -64,6 +65,11 @@ public final class AdminMenu implements Listener {
         }
         inventory.setItem(24, item(Material.MAP, "§aArenen verwalten",
                 "§7Arenen, Vorlagen und Spawnpunkte bearbeiten."));
+        if (game.getState() == GameState.WAITING || game.getState() == GameState.LOBBY
+                || game.getState() == GameState.COUNTDOWN) {
+            inventory.setItem(26, item(Material.SHIELD, "§bTeams verwalten",
+                    "§7Lobby-Teams ansehen und Spieler zuweisen.", "§eKlicken zum Öffnen"));
+        }
         if (game.getState() == GameState.ENDING || game.getState() == GameState.RESETTING) {
             inventory.setItem(20, item(Material.CLOCK, "§eReset / Aufräumen",
                     "§7Stellt Spieler wieder her und entfernt die temporäre Map."));
@@ -236,6 +242,31 @@ public final class AdminMenu implements Listener {
             plugin.getArenaManagementMenu().open(player);
             return;
         }
+        if (holder.screen == Screen.OVERVIEW && slot == 26) {
+            openTeamAssignments(player);
+            return;
+        }
+        if (holder.screen == Screen.TEAM_ASSIGNMENTS) {
+            Game active = plugin.getGameManager().getActiveGame().orElse(null);
+            if (active == null || (active.getState() != GameState.WAITING && active.getState() != GameState.LOBBY
+                    && active.getState() != GameState.COUNTDOWN)) {
+                player.sendMessage("§cDie Teamverwaltung ist nur vor Spielbeginn verfügbar.");
+                open(player);
+                return;
+            }
+            if (slot == 49) { openOverview(player); return; }
+            String id = holder.entries.get(slot);
+            if (id != null) {
+                UUID playerId = UUID.fromString(id);
+                List<String> keys = teamKeys(active.getMode().getId());
+                String current = active.getLobbyTeamPreference(playerId).orElse("");
+                int index = keys.indexOf(current);
+                String next = index + 1 >= keys.size() ? "" : keys.get(index + 1);
+                active.setLobbyTeamPreference(playerId, next.isEmpty() ? null : next);
+                openTeamAssignments(player);
+            }
+            return;
+        }
         if (holder.screen == Screen.OVERVIEW && slot == 22) {
             Game active = plugin.getGameManager().getActiveGame().orElse(null);
             if (active == null) {
@@ -323,7 +354,53 @@ public final class AdminMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { OVERVIEW, MODES, ARENAS, SETTINGS }
+    private void openTeamAssignments(Player player) {
+        Game game = plugin.getGameManager().getActiveGame().orElse(null);
+        if (game == null) { openModes(player); return; }
+        MenuHolder holder = new MenuHolder(Screen.TEAM_ASSIGNMENTS, game.getMode().getId(), null, 0);
+        Inventory inventory = Bukkit.createInventory(holder, SIZE, Component.text("ManHunt • Lobby-Teams"));
+        holder.inventory = inventory;
+        inventory.setItem(4, item(Material.SHIELD, "§bTeamzuweisung",
+                "§7Spieler anklicken, um ihre Wunschrolle zu wechseln.",
+                "§7Die festen Teamgrößen des Modus bleiben erhalten.",
+                "§7Nicht zugewiesene Spieler werden automatisch verteilt."));
+        int slot = 9;
+        for (GamePlayer participant : game.getPlayers()) {
+            if (slot > 44) break;
+            UUID id = participant.getUniqueId();
+            String name = Bukkit.getOfflinePlayer(id).getName();
+            if (name == null) name = id.toString().substring(0, 8);
+            String selected = game.getLobbyTeamPreference(id).orElse("");
+            holder.entries.put(slot, id.toString());
+            inventory.setItem(slot++, item(Material.PLAYER_HEAD, "§e" + name,
+                    "§7Zuweisung: §f" + teamLabel(selected),
+                    "§eKlicken zum Wechseln"));
+        }
+        inventory.setItem(49, item(Material.ARROW, "§eZurück", "§7Zur Rundenverwaltung"));
+        player.openInventory(inventory);
+    }
+
+    private List<String> teamKeys(String modeId) {
+        return switch (modeId.toLowerCase(java.util.Locale.ROOT)) {
+            case "hitman" -> List.of("hitmen", "survivors", "");
+            case "juggernaut" -> List.of("juggernaut", "hunters", "");
+            case "infection" -> List.of("infected", "survivors", "");
+            default -> List.of("");
+        };
+    }
+
+    private String teamLabel(String key) {
+        return switch (key) {
+            case "hitmen" -> "Hitman";
+            case "survivors" -> "Überlebende";
+            case "juggernaut" -> "Juggernaut";
+            case "hunters" -> "Jäger";
+            case "infected" -> "Infizierte";
+            default -> "Automatisch";
+        };
+    }
+
+    private enum Screen { OVERVIEW, MODES, ARENAS, SETTINGS, TEAM_ASSIGNMENTS }
 
     private static final class MenuHolder implements InventoryHolder {
         private final Screen screen;
