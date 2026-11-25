@@ -2,6 +2,7 @@ package de.jawollo07.manhunt.game;
 
 import de.jawollo07.manhunt.arena.Arena;
 import de.jawollo07.manhunt.arena.ArenaSpawnPoint;
+import de.jawollo07.manhunt.arena.ArenaValidation;
 import de.jawollo07.manhunt.map.MapInstance;
 import de.jawollo07.manhunt.map.MapManager;
 import de.jawollo07.manhunt.player.PlayerManager;
@@ -80,6 +81,11 @@ public final class GameLifecycleService {
         }
         if (game.getPlayerCount() < game.getSettings().minPlayers()) {
             throw new IllegalStateException("Not enough players to prepare this game");
+        }
+
+        ArenaValidation spawnValidation = ArenaValidation.check(game.getArena(), game.getMode(), true, false);
+        if (!spawnValidation.ready()) {
+            throw new IllegalStateException(String.join(" ", spawnValidation.errors()));
         }
 
         captureParticipants(game);
