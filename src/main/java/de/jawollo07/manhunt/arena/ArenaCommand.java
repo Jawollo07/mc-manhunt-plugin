@@ -123,7 +123,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         }
         Arena arena = plugin.getArenaService().find(args[2]).orElseThrow(
                 () -> new IllegalArgumentException("Arena nicht gefunden: " + args[2]));
-        if (!player.getWorld().getName().equals(arena.worldName())) {
+        if (!plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName())) {
             throw new IllegalArgumentException("Du musst dich zum Setzen des Spawnpunkts in der Vorlagenwelt " + arena.worldName() + " befinden.");
         }
         Location location = player.getLocation();
@@ -176,7 +176,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         String team = normalizeTeam(args[4]);
         if (action.equals("set")) {
             if (!(sender instanceof Player player)) throw new IllegalArgumentException("Dieser Befehl kann nur ingame ausgeführt werden.");
-            if (!player.getWorld().getName().equals(arena.worldName())) {
+            if (!plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName())) {
                 throw new IllegalArgumentException("Du musst dich in der Vorlagenwelt " + arena.worldName() + " befinden. Nutze /manhunt arena edit " + arena.worldName() + ".");
             }
             int next = teamSpawnPoints(arena, team).stream().mapToInt(point -> spawnIndex(point.name())).max().orElse(0) + 1;
@@ -204,7 +204,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
                 .findFirst().orElseThrow(() -> new IllegalArgumentException("Dieser Team-Spawnpunkt existiert nicht."));
         if (action.equals("tp")) {
             if (!(sender instanceof Player player)) throw new IllegalArgumentException("Dieser Befehl kann nur ingame ausgeführt werden.");
-            org.bukkit.World world = plugin.getServer().getWorld(arena.worldName());
+            org.bukkit.World world = plugin.getMapManager().getLoadedTemplateWorld(arena.worldName());
             if (world == null) throw new IllegalStateException("Die Vorlagenwelt ist nicht geladen. Nutze /manhunt arena edit " + arena.worldName() + ".");
             player.teleport(selected.toLocation(world));
             sender.sendMessage("§aZum Spawnpunkt §e" + team + " #" + index + " §ateleportiert.");
