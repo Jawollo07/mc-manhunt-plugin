@@ -189,6 +189,11 @@ public final class BuiltinGameModes {
                     game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).count();
         }
 
+        protected List<UUID> activeTeamMembers(Game game, Team team) {
+            return team.getMembers().stream().filter(id ->
+                    game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).toList();
+        }
+
         protected void apply(Player player, PotionEffectType type, int duration, int amplifier) {
             if (player != null) player.addPotionEffect(new PotionEffect(type, duration, amplifier, true, false, true));
         }
@@ -244,6 +249,31 @@ public final class BuiltinGameModes {
                                         return offlineName == null ? nextTarget.toString().substring(0, 8) : offlineName;
                                     });
                     killer.sendMessage("§aNeues Ziel: §e" + nextName);
+                }
+            }
+            List<UUID> alive = activePlayers(game);
+            if (alive.size() <= 1) finish(game, GameOutcome.VICTORY, alive, "Letzter Assassine übrig");
+        }
+
+        @Override public void onPlayerQuit(Game game, GamePlayer quitter) {
+            UUID leavingId = quitter.getUniqueId();
+            UUID inheritedTarget = targets.remove(leavingId);
+            UUID previousHunter = targets.entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(leavingId))
+                    .map(Map.Entry::getKey).findFirst().orElse(null);
+            if (previousHunter != null) {
+                if (inheritedTarget == null || previousHunter.equals(inheritedTarget)) {
+                    targets.remove(previousHunter);
+                } else {
+                    targets.put(previousHunter, inheritedTarget);
+                    Player hunter = Bukkit.getPlayer(previousHunter);
+                    if (hunter != null) {
+                        String name = java.util.Optional.ofNullable(Bukkit.getPlayer(inheritedTarget))
+                                .map(Player::getName)
+                                .orElseGet(() -> java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(inheritedTarget).getName())
+                                        .orElse(inheritedTarget.toString().substring(0, 8)));
+                        hunter.sendMessage("§eDein Ziel hat die Runde verlassen. Neues Ziel: §c" + name);
+                    }
                 }
             }
             List<UUID> alive = activePlayers(game);
@@ -309,10 +339,22 @@ public final class BuiltinGameModes {
         @Override public void onPlayerDeath(Game game, GamePlayer victim, UUID killerId) {
             if (victim.isEliminated()) return;
             eliminate(game, victim);
-            if (survivors.getMembers().contains(victim.getUniqueId())) {
-                if (activeTeamCount(game, survivors) == 0) finish(game, GameOutcome.VICTORY, hitmen.getMembers().stream().toList(), "Alle Überlebenden eliminiert");
-            } else if (activeTeamCount(game, hitmen) == 0) {
-                finish(game, GameOutcome.VICTORY, survivors.getMembers().stream().filter(id -> game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).toList(), "Alle Hitmen eliminiert");
+            checkTeams(game);
+        }
+
+        @Override public void onPlayerQuit(Game game, GamePlayer quitter) {
+            checkTeams(game);
+        }
+
+        private void checkTeams(Game game) {
+            List<UUID> livingHitmen = activeTeamMembers(game, hitmen);
+            List<UUID> livingSurvivors = activeTeamMembers(game, survivors);
+            if (livingHitmen.isEmpty() && livingSurvivors.isEmpty()) {
+                finish(game, GameOutcome.DRAW, List.of(), "Niemand ist mehr in der Runde");
+            } else if (livingSurvivors.isEmpty()) {
+                finish(game, GameOutcome.VICTORY, livingHitmen, "Alle Überlebenden ausgeschieden");
+            } else if (livingHitmen.isEmpty()) {
+                finish(game, GameOutcome.VICTORY, livingSurvivors, "Alle Hitmen ausgeschieden");
             }
         }
 
@@ -388,12 +430,23 @@ public final class BuiltinGameModes {
         @Override public void onPlayerDeath(Game game, GamePlayer victim, UUID killerId) {
             if (victim.isEliminated()) return;
             eliminate(game, victim);
-            if (victim.getUniqueId().equals(bossId)) {
-                finish(game, GameOutcome.VICTORY, hunters.getMembers().stream().filter(id ->
-                        game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).toList(), "Juggernaut besiegt");
-            } else if (hunters.getMembers().stream().noneMatch(id ->
-                    game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false))) {
-                finish(game, GameOutcome.VICTORY, List.of(bossId), "Alle Jäger eliminiert");
+            checkVictory(game);
+        }
+
+        @Override public void onPlayerQuit(Game game, GamePlayer quitter) {
+            checkVictory(game);
+        }
+
+        private void checkVictory(Game game) {
+            boolean bossAlive = game.getPlayer(bossId)
+                    .map(player -> player.getStatus() == PlayerStatus.PLAYING).orElse(false);
+            List<UUID> livingHunters = activeTeamMembers(game, hunters);
+            if (!bossAlive && livingHunters.isEmpty()) {
+                finish(game, GameOutcome.DRAW, List.of(), "Niemand ist mehr in der Runde");
+            } else if (!bossAlive) {
+                finish(game, GameOutcome.VICTORY, livingHunters, "Juggernaut ausgeschieden");
+            } else if (livingHunters.isEmpty()) {
+                finish(game, GameOutcome.VICTORY, List.of(bossId), "Alle Jäger ausgeschieden");
             }
         }
 
@@ -445,13 +498,27 @@ public final class BuiltinGameModes {
                 victim.setStatus(PlayerStatus.PLAYING);
                 Player player = Bukkit.getPlayer(victim.getUniqueId());
                 if (player != null) {
-                    player.sendMessage("§2Du bist infiziert! Jage die Überlebenden.");
+                    player.sendMessage("§2Du bist jetzt infiziert! Nach dem Respawn jagst du die Überlebenden.");
                     apply(player, PotionEffectType.SPEED, 20 * 20, 0);
                 }
             }
-            long remaining = survivors.getMembers().stream().filter(id ->
-                    game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).count();
-            if (remaining == 0) finish(game, GameOutcome.VICTORY, infected.getMembers().stream().toList(), "Alle Spieler infiziert");
+            checkTeams(game);
+        }
+
+        @Override public void onPlayerQuit(Game game, GamePlayer quitter) {
+            checkTeams(game);
+        }
+
+        private void checkTeams(Game game) {
+            List<UUID> livingInfected = activeTeamMembers(game, infected);
+            List<UUID> livingSurvivors = activeTeamMembers(game, survivors);
+            if (livingInfected.isEmpty() && livingSurvivors.isEmpty()) {
+                finish(game, GameOutcome.DRAW, List.of(), "Niemand ist mehr in der Runde");
+            } else if (livingSurvivors.isEmpty()) {
+                finish(game, GameOutcome.VICTORY, livingInfected, "Alle Überlebenden infiziert oder ausgeschieden");
+            } else if (livingInfected.isEmpty()) {
+                finish(game, GameOutcome.VICTORY, livingSurvivors, "Alle Infizierten ausgeschieden");
+            }
         }
 
         @Override public void onTick(Game game, long elapsedSeconds) {
