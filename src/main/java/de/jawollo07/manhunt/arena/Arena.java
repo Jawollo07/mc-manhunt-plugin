@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-public record Arena(String id, String displayName, String worldName, Map<String, ArenaSpawnPoint> spawnPoints) {
+public record Arena(String id, String displayName, String worldName, Map<String, ArenaSpawnPoint> spawnPoints, java.util.Set<String> enabledModeIds) {
     public Arena {
         if (id == null || id.isBlank()) throw new IllegalArgumentException("Arena id must not be blank");
         if (displayName == null || displayName.isBlank()) throw new IllegalArgumentException("Arena display name must not be blank");
@@ -24,10 +24,32 @@ public record Arena(String id, String displayName, String worldName, Map<String,
             }
         });
         spawnPoints = Collections.unmodifiableMap(copy);
+        Objects.requireNonNull(enabledModeIds, "enabledModeIds");
+        java.util.Set<String> modes = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (String modeId : enabledModeIds) {
+            if (modeId == null || !modeId.trim().matches("[a-zA-Z0-9_-]{1,64}")) {
+                throw new IllegalArgumentException("Invalid enabled game mode id: " + modeId);
+            }
+            modes.add(modeId.trim().toLowerCase(java.util.Locale.ROOT));
+        }
+        enabledModeIds = Collections.unmodifiableSet(modes);
+    }
+
+    /** An empty mode set keeps legacy arenas compatible with every registered mode. */
+    public Arena(String id, String displayName, String worldName, Map<String, ArenaSpawnPoint> spawnPoints) {
+        this(id, displayName, worldName, spawnPoints, java.util.Set.of());
     }
 
     public Arena(String id, String displayName, String worldName) {
-        this(id, displayName, worldName, Map.of());
+        this(id, displayName, worldName, Map.of(), java.util.Set.of());
+    }
+
+    public boolean supportsMode(String modeId) {
+        return enabledModeIds.isEmpty() || enabledModeIds.contains(modeId.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    public Arena withEnabledModes(java.util.Set<String> modeIds) {
+        return new Arena(id, displayName, worldName, spawnPoints, modeIds);
     }
 
     public Optional<ArenaSpawnPoint> spawnPoint(String name) {
@@ -49,7 +71,7 @@ public record Arena(String id, String displayName, String worldName, Map<String,
 
     /** Creates an independent arena entry using the same template and spawn layout. */
     public Arena copyAs(String newId, String newDisplayName) {
-        return new Arena(newId, newDisplayName, worldName, spawnPoints);
+        return new Arena(newId, newDisplayName, worldName, spawnPoints, enabledModeIds);
     }
 
     public static String normalizeSpawnKey(String name) {
