@@ -14,6 +14,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GameLifecycleServiceTest {
     @Test
+    void randomTeamDistributionDefaultsToEnabledAndCanBeDisabled() {
+        GameSettings defaults = new GameSettings(2, 8, 5, 300, false, true);
+        GameSettings ordered = new GameSettings(2, 8, 5, 300, false, true, false);
+
+        assertTrue(defaults.randomTeamDistribution());
+        assertFalse(ordered.randomTeamDistribution());
+    }
+
+    @Test
     void invokesModeCallbacksDuringLifecycle() {
         AtomicInteger prepared = new AtomicInteger();
         AtomicInteger started = new AtomicInteger();
