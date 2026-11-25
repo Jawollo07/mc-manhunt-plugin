@@ -148,6 +148,7 @@ public final class BuiltinGameModes {
         Assassin(ManHuntPlugin plugin) { super(plugin); }
         @Override public String getId() { return "assassin"; }
         @Override public String getDisplayName() { return "Assassin Manhunt"; }
+        @Override public List<String> getRequiredArenaSpawnPoints() { return List.of("team:assassins"); }
 
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
@@ -218,11 +219,12 @@ public final class BuiltinGameModes {
         @Override public String getId() { return "hitman"; }
         @Override public String getDisplayName() { return "Hitman"; }
         @Override public int getMinimumPlayers() { return 3; }
+        @Override public List<String> getRequiredArenaSpawnPoints() { return List.of("team:hitmen", "team:survivors"); }
 
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 3) throw new IllegalStateException("Hitman benötigt mindestens drei Spieler.");
-            Collections.shuffle(players);
+            if (game.getSettings().randomTeamDistribution()) Collections.shuffle(players);
             int hitmanCount = players.size() >= 7 ? 2 : 1;
             hitmen = team(game, "Hitmen", "DARK_RED");
             survivors = team(game, "Survivors", "GREEN");
@@ -297,11 +299,12 @@ public final class BuiltinGameModes {
         Juggernaut(ManHuntPlugin plugin) { super(plugin); }
         @Override public String getId() { return "juggernaut"; }
         @Override public String getDisplayName() { return "Juggernaut"; }
+        @Override public List<String> getRequiredArenaSpawnPoints() { return List.of("team:juggernaut", "team:hunters"); }
 
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 2) throw new IllegalStateException("Juggernaut benötigt mindestens zwei Spieler.");
-            Collections.shuffle(players);
+            if (game.getSettings().randomTeamDistribution()) Collections.shuffle(players);
             bossId = players.get(0).getUniqueId();
             bossTeam = team(game, "Juggernaut", "DARK_RED");
             hunters = team(game, "Hunters", "BLUE");
@@ -357,11 +360,12 @@ public final class BuiltinGameModes {
         Infection(ManHuntPlugin plugin) { super(plugin); }
         @Override public String getId() { return "infection"; }
         @Override public String getDisplayName() { return "Infection"; }
+        @Override public List<String> getRequiredArenaSpawnPoints() { return List.of("team:infected", "team:survivors"); }
 
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 2) throw new IllegalStateException("Infection benötigt mindestens zwei Spieler.");
-            Collections.shuffle(players);
+            if (game.getSettings().randomTeamDistribution()) Collections.shuffle(players);
             int initial = players.size() >= 7 ? 2 : 1;
             infected = team(game, "Infected", "DARK_GREEN");
             survivors = team(game, "Survivors", "AQUA");
