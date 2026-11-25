@@ -135,6 +135,23 @@ public final class BuiltinGameModes {
             game.getRoleManager().assign(player.getUniqueId(), role, team.getId());
         }
 
+        protected List<GamePlayer> orderedForTeams(Game game, List<GamePlayer> source,
+                                                   String primaryKey, String secondaryKey) {
+            List<GamePlayer> players = new ArrayList<>(source);
+            if (game.getSettings().randomTeamDistribution()) Collections.shuffle(players);
+            List<GamePlayer> primary = players.stream()
+                    .filter(p -> game.getLobbyTeamPreference(p.getUniqueId()).orElse("").equals(primaryKey)).toList();
+            List<GamePlayer> neutral = players.stream()
+                    .filter(p -> game.getLobbyTeamPreference(p.getUniqueId()).isEmpty()).toList();
+            List<GamePlayer> secondary = players.stream()
+                    .filter(p -> game.getLobbyTeamPreference(p.getUniqueId()).orElse("").equals(secondaryKey)).toList();
+            List<GamePlayer> ordered = new ArrayList<>();
+            ordered.addAll(primary);
+            ordered.addAll(neutral);
+            ordered.addAll(secondary);
+            return ordered;
+        }
+
         protected void apply(Player player, PotionEffectType type, int duration, int amplifier) {
             if (player != null) player.addPotionEffect(new PotionEffect(type, duration, amplifier, true, false, true));
         }
@@ -224,8 +241,8 @@ public final class BuiltinGameModes {
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 3) throw new IllegalStateException("Hitman benötigt mindestens drei Spieler.");
-            if (game.getSettings().randomTeamDistribution()) Collections.shuffle(players);
             int hitmanCount = players.size() >= 7 ? 2 : 1;
+            players = orderedForTeams(game, players, "hitmen", "survivors");
             hitmen = team(game, "Hitmen", "DARK_RED");
             survivors = team(game, "Survivors", "GREEN");
             for (int i = 0; i < players.size(); i++) {
@@ -304,7 +321,7 @@ public final class BuiltinGameModes {
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 2) throw new IllegalStateException("Juggernaut benötigt mindestens zwei Spieler.");
-            if (game.getSettings().randomTeamDistribution()) Collections.shuffle(players);
+            players = orderedForTeams(game, players, "juggernaut", "hunters");
             bossId = players.get(0).getUniqueId();
             bossTeam = team(game, "Juggernaut", "DARK_RED");
             hunters = team(game, "Hunters", "BLUE");
@@ -365,8 +382,8 @@ public final class BuiltinGameModes {
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 2) throw new IllegalStateException("Infection benötigt mindestens zwei Spieler.");
-            if (game.getSettings().randomTeamDistribution()) Collections.shuffle(players);
             int initial = players.size() >= 7 ? 2 : 1;
+            players = orderedForTeams(game, players, "infected", "survivors");
             infected = team(game, "Infected", "DARK_GREEN");
             survivors = team(game, "Survivors", "AQUA");
             for (int i = 0; i < players.size(); i++) {
