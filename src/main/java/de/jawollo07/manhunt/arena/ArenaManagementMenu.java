@@ -410,9 +410,60 @@ public final class ArenaManagementMenu implements Listener {
             if (template.loaded()) {
                 player.sendMessage("§eHinweis: Die Vorlagenwelt ist aktuell geladen. Vor dem Spielstart muss sie entladen sein.");
             }
-            openDetails(player, arena.id());
+            openSetup(player, arena.id());
         } catch (SQLException | IllegalArgumentException exception) {
             player.sendMessage("§cVorlage konnte nicht verwendet werden: " + exception.getMessage());
+        }
+    }
+
+    /** Guided, resumable arena setup. Progress is derived from the persisted arena configuration. */
+    private void openSetup(Player player, String arenaId) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            var template = plugin.getMapManager().inspectTemplate(arena.worldName());
+            boolean defaultSpawn = arena.spawnPoint("default").isPresent();
+            long teamSpawns = arena.spawnPoints().keySet().stream()
+                    .filter(key -> key.toLowerCase(Locale.ROOT).startsWith("team:")).count();
+            boolean insideTemplate = plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName());
+            MenuHolder holder = new MenuHolder(Screen.SETUP, arena.id(), null);
+            Inventory inventory = inventory(holder, "ManHunt • Arena-Setup");
+            inventory.setItem(4, item(Material.WRITABLE_BOOK, "§eArena einrichten: " + arena.displayName(),
+                    "§7Vorlage: §f" + arena.worldName(),
+                    "§7Deine Fortschritte werden automatisch gespeichert.",
+                    "§7Du kannst das Setup jederzeit verlassen und fortsetzen."));
+            inventory.setItem(10, item(template.valid() ? Material.LIME_DYE : Material.BARRIER,
+                    "§a1. Kartenvorlage auswählen",
+                    "§7" + (template.valid() ? "Ausgewählt: " + arena.worldName() : "Vorlage ist ungültig."),
+                    "§7Dieser Schritt ist " + (template.valid() ? "§aerledigt" : "§coffen") + "§7."));
+            inventory.setItem(12, item(insideTemplate ? Material.LIME_DYE : Material.COMPASS,
+                    "§a2. Vorlagenwelt betreten",
+                    "§7" + (insideTemplate ? "Du befindest dich bereits in der Vorlagenwelt." : "Die Welt wird geladen und geöffnet."),
+                    "§eKlicken zum Betreten"));
+            inventory.setItem(14, item(defaultSpawn ? Material.LIME_DYE : Material.RED_DYE,
+                    "§a3. Standard-Spawn festlegen",
+                    "§7" + (defaultSpawn ? "§aGesetzt" : "§cNoch nicht gesetzt"),
+                    "§7Wird an deiner aktuellen Position gespeichert.",
+                    "§eKlicken zum Setzen"));
+            inventory.setItem(16, item(teamSpawns > 0 ? Material.LIME_DYE : Material.CHEST,
+                    "§a4. Team-Spawnpunkte einrichten",
+                    "§7Gespeicherte Team-Spawnpunkte: §f" + teamSpawns,
+                    "§7Mehrere Spawnpunkte pro Team sind möglich.",
+                    "§eKlicken für die Team-Einrichtung"));
+            inventory.setItem(31, item(defaultSpawn && teamSpawns > 0 && template.valid()
+                            ? Material.EMERALD_BLOCK : Material.GRAY_DYE,
+                    defaultSpawn && teamSpawns > 0 && template.valid() ? "§aGrundsetup vollständig" : "§eSetup noch unvollständig",
+                    "§7Vorlage: " + (template.valid() ? "§aOK" : "§cFehler"),
+                    "§7Standard-Spawn: " + (defaultSpawn ? "§aOK" : "§cFehlt"),
+                    "§7Team-Spawns: " + (teamSpawns > 0 ? "§aVorhanden" : "§cFehlen"),
+                    "§7Die Modi-Prüfung erfolgt zusätzlich vor Spielstart."));
+            inventory.setItem(45, item(Material.ARROW, "§eZur Arena-Übersicht"));
+            inventory.setItem(49, item(Material.SUNFLOWER, "§eFortschritt aktualisieren"));
+            inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
+            player.openInventory(inventory);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cSetup konnte nicht geladen werden: " + exception.getMessage());
+            openArenaList(player);
         }
     }
 
@@ -522,6 +573,40 @@ public final class ArenaManagementMenu implements Listener {
                     openTemplateDetails(player, holder.arenaId);
                 } catch (IllegalStateException exception) {
                     player.sendMessage("§c" + exception.getMessage());
+                }
+                return;
+            }
+        } else if (holder.screen == Screen.SETUP) {
+            if (slot == 45) { openArenaList(player); return; }
+            if (slot == 49) { openSetup(player, holder.arenaId); return; }
+            if (slot == 53) { player.closeInventory(); return; }
+            if (slot == 12) {
+                try {
+                    Arena arena = plugin.getArenaService().find(holder.arenaId).orElseThrow();
+                    enterTemplateForEditing(player, arena.worldName());
+                } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+                    player.sendMessage("§cVorlagenwelt konnte nicht geöffnet werden: " + exception.getMessage());
+                }
+                return;
+            }
+            if (slot == 14) { setSpawn(player, holder.arenaId, "default"); return; }
+            if (slot == 16) { openDetails(player, holder.arenaId); return; }
+            if (slot == 31) {
+                try {
+                    Arena arena = plugin.getArenaService().find(holder.arenaId).orElseThrow();
+                    boolean ready = arena.spawnPoint("default").isPresent()
+                            && arena.spawnPoints().keySet().stream()
+                            .anyMatch(key -> key.toLowerCase(Locale.ROOT).startsWith("team:"))
+                            && plugin.getMapManager().inspectTemplate(arena.worldName()).valid();
+                    if (!ready) {
+                        player.sendMessage("§eBitte erledige zuerst alle offenen Setup-Schritte.");
+                        openSetup(player, holder.arenaId);
+                    } else {
+                        player.sendMessage("§aDas Grundsetup der Arena ist gespeichert. Die Spielmodus-Prüfung erfolgt vor Spielstart.");
+                        openDetails(player, holder.arenaId);
+                    }
+                } catch (SQLException | IllegalArgumentException exception) {
+                    player.sendMessage("§cSetup-Prüfung fehlgeschlagen: " + exception.getMessage());
                 }
                 return;
             }
@@ -703,7 +788,7 @@ public final class ArenaManagementMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, DETAILS, CONFIRM }
+    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, DETAILS, CONFIRM }
     private enum InputAction { RENAME, CHANGE_TEMPLATE, DUPLICATE }
     private record PendingInput(String arenaId, InputAction action) { }
 
