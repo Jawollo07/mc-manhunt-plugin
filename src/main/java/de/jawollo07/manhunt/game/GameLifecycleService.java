@@ -152,6 +152,27 @@ public final class GameLifecycleService {
         }
     }
 
+    /**
+     * Resolves the arena respawn location for an in-round death. Converted
+     * Infection players use their new team's spawn; eliminated spectators
+     * return to the neutral arena spawn.
+     */
+    public Location getRespawnLocation(UUID playerId) {
+        Game game = requireGame();
+        if (game.getState() != GameState.RUNNING || mapManager == null || game.getMapInstance().isEmpty()) {
+            return null;
+        }
+        GamePlayer participant = game.getPlayer(playerId).orElse(null);
+        if (participant == null) return null;
+        World world = mapManager.getWorld(game.getMapInstance().orElseThrow());
+        if (participant.isEliminated()) {
+            return game.getArena().spawnPoint("default")
+                    .map(point -> point.toLocation(world))
+                    .orElseGet(world::getSpawnLocation);
+        }
+        return resolveSpawn(game, participant, world);
+    }
+
     private Location resolveSpawn(Game game, GamePlayer participant, World world) {
         Arena arena = game.getArena();
         Team team = game.getTeamManager().getTeamOf(participant.getUniqueId()).orElse(null);
