@@ -39,6 +39,20 @@ public final class ArenaRepository {
                     statement.setString(3, arena.worldName());
                     statement.executeUpdate();
                 }
+                try (PreparedStatement deleteModes = connection.prepareStatement(
+                        "DELETE FROM arena_enabled_modes WHERE arena_id = ?")) {
+                    deleteModes.setString(1, arena.id());
+                    deleteModes.executeUpdate();
+                }
+                try (PreparedStatement insertMode = connection.prepareStatement(
+                        "INSERT INTO arena_enabled_modes (arena_id, mode_id) VALUES (?, ?)")) {
+                    for (String modeId : arena.enabledModeIds()) {
+                        insertMode.setString(1, arena.id());
+                        insertMode.setString(2, modeId);
+                        insertMode.addBatch();
+                    }
+                    insertMode.executeBatch();
+                }
                 try (PreparedStatement delete = connection.prepareStatement(
                         "DELETE FROM arena_spawn_points WHERE arena_id = ?")) {
                     delete.setString(1, arena.id());
@@ -135,6 +149,14 @@ public final class ArenaRepository {
                 }
             }
         }
-        return new Arena(id, displayName, worldName, points);
+        java.util.Set<String> enabledModes = new java.util.LinkedHashSet<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT mode_id FROM arena_enabled_modes WHERE arena_id = ? ORDER BY mode_id")) {
+            statement.setString(1, id);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) enabledModes.add(result.getString("mode_id"));
+            }
+        }
+        return new Arena(id, displayName, worldName, points, enabledModes);
     }
 }
