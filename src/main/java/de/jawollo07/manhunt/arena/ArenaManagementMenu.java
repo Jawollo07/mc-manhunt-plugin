@@ -562,6 +562,11 @@ public final class ArenaManagementMenu implements Listener {
                         Arena arena = plugin.getArenaService().find(holder.arenaId).orElseThrow();
                         ArenaSpawnPoint point = arena.spawnPoint(spawnName).orElseThrow(
                                 () -> new IllegalArgumentException("Dieser Spawnpunkt existiert nicht mehr."));
+                        String activeTemplate = editingTemplateIds.get(player.getUniqueId());
+                        if (activeTemplate != null && !activeTemplate.equalsIgnoreCase(arena.worldName())) {
+                            throw new IllegalStateException("Du bearbeitest bereits Vorlage " + activeTemplate
+                                    + ". Verlasse diese Vorlage zuerst.");
+                        }
                         if (!plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName())) {
                             enterTemplateForEditing(player, arena.worldName());
                         }
