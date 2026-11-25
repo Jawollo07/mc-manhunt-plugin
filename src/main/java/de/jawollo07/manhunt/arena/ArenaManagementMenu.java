@@ -76,6 +76,9 @@ public final class ArenaManagementMenu implements Listener {
         }
         inventory.setItem(45, item(Material.MAP, "§aKartenvorlagen",
                 "§7Vorhandene Minecraft-Welten durchsuchen"));
+        inventory.setItem(46, item(Material.WRITABLE_BOOK, "§aNeue Arena erstellen",
+                "§7Wähle eine Kartenvorlage aus.",
+                "§7Die Arena wird automatisch angelegt."));
         if (editingReturnLocations.containsKey(player.getUniqueId())) {
             inventory.setItem(47, item(Material.OAK_DOOR, "§eVorlage verlassen",
                     "§7Zurück zum vorherigen Standort", "§7und die Vorlage sicher entladen."));
@@ -139,16 +142,25 @@ public final class ArenaManagementMenu implements Listener {
                     "default", "team:hitmen", "team:survivors", "team:juggernaut",
                     "team:hunters", "team:assassins", "team:infected", "extraction"
             };
+            String[] spawnLabels = {
+                    "Standard-Spawn", "Hitmen", "Überlebende", "Juggernaut",
+                    "Jäger", "Assassinen", "Infizierte", "Evakuierung"
+            };
             Material[] spawnIcons = {
                     Material.COMPASS, Material.IRON_SWORD, Material.SHIELD, Material.NETHERITE_CHESTPLATE,
                     Material.BOW, Material.DIAMOND_SWORD, Material.ROTTEN_FLESH, Material.ENDER_EYE
             };
             for (int i = 0; i < spawnNames.length; i++) {
                 String name = spawnNames[i];
-                boolean configured = arena.spawnPoint(name).isPresent();
+                int count = spawnCount(arena, name);
+                boolean configured = count > 0;
+                String action = name.startsWith("team:")
+                        ? "§eKlicken: Nächsten Team-Spawn hier hinzufügen"
+                        : configured ? "§7Klicken: Position überschreiben" : "§7Klicken: Position hier setzen";
                 inventory.setItem(10 + i, item(configured ? Material.LIME_DYE : spawnIcons[i],
-                        (configured ? "§a" : "§e") + name,
-                        configured ? "§7Gespeichert – klicken zum Überschreiben" : "§7Noch nicht gesetzt",
+                        (configured ? "§a" : "§e") + spawnLabels[i],
+                        name.startsWith("team:") ? "§7Gespeicherte Positionen: §f" + count : (configured ? "§7Gespeichert" : "§7Noch nicht gesetzt"),
+                        action,
                         "§7Du musst dich in der Vorlagenwelt befinden."));
                 holder.spawnActions.put(10 + i, name);
             }
@@ -218,11 +230,13 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Lädt die Originalwelt, falls nötig.",
                     "§7Teleportiert dich zum Weltspawn.",
                     "§7Danach kannst du Spawnpunkte setzen."));
-            inventory.setItem(22, item(Material.CHEST, "§aIn ManHunt importieren",
-                    "§7Registriert diese vorhandene Welt als Arena.",
-                    "§7Erstellt einen Arena-Eintrag, falls er fehlt.",
-                    "§7Die Originalwelt wird weder verschoben noch gelöscht.",
-                    "§7Anschließend Spawnpunkte verwalten."));
+            boolean alreadyRegistered = linkedArenas.stream().anyMatch(arena -> arena.worldName().equalsIgnoreCase(templateId)
+                    || (templateId.startsWith("minecraft:") && arena.worldName().equalsIgnoreCase(templateId.substring("minecraft:".length()))));
+            inventory.setItem(22, item(Material.CHEST, alreadyRegistered ? "§aVorhandene Arena öffnen" : "§aArena aus Vorlage erstellen",
+                    "§7" + (alreadyRegistered ? "Öffnet die bereits verknüpfte Arena." : "Legt automatisch eine Arena an."),
+                    "§7Name und ID werden aus der Vorlage abgeleitet.",
+                    "§7Die Originalwelt bleibt unverändert.",
+                    "§7Danach kannst du Spawnpunkte setzen."));
             if (plugin.getMapManager().isLoadedForEditing(templateId)) {
                 inventory.setItem(24, item(Material.REDSTONE_BLOCK, "§cVorlage entladen",
                         "§7Nur möglich, wenn sich keine Spieler",
@@ -371,14 +385,32 @@ public final class ArenaManagementMenu implements Listener {
                 return;
             }
             var location = player.getLocation();
-            ArenaSpawnPoint point = new ArenaSpawnPoint(spawnName, location.getX(), location.getY(),
+            String storedName = spawnName;
+            if (spawnName.startsWith("team:")) {
+                int next = arena.spawnPoints().keySet().stream()
+                        .filter(key -> key.toLowerCase(Locale.ROOT).startsWith(spawnName.toLowerCase(Locale.ROOT) + ":"))
+                        .map(key -> key.substring(key.lastIndexOf(':') + 1))
+                        .filter(part -> part.matches("\\d+"))
+                        .mapToInt(Integer::parseInt).max().orElse(0) + 1;
+                storedName = spawnName + ":" + next;
+            }
+            ArenaSpawnPoint point = new ArenaSpawnPoint(storedName, location.getX(), location.getY(),
                     location.getZ(), location.getYaw(), location.getPitch());
             plugin.getArenaService().save(arena.withSpawnPoint(point));
-            player.sendMessage("§aSpawnpunkt §e" + spawnName + " §awurde an deiner Position gespeichert.");
+            player.sendMessage("§aSpawnpunkt §e" + storedName + " §awurde an deiner Position gespeichert.");
             openDetails(player, arenaId);
         } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
             player.sendMessage("§cSpawnpunkt konnte nicht gespeichert werden: " + exception.getMessage());
         }
+    }
+
+    private static int spawnCount(Arena arena, String spawnName) {
+        if (!spawnName.startsWith("team:")) return arena.spawnPoint(spawnName).isPresent() ? 1 : 0;
+        String prefix = spawnName.toLowerCase(Locale.ROOT);
+        return (int) arena.spawnPoints().keySet().stream()
+                .filter(key -> key.equalsIgnoreCase(spawnName)
+                        || key.toLowerCase(Locale.ROOT).startsWith(prefix + ":"))
+                .count();
     }
 
     private void deleteConfirmed(Player player, MenuHolder holder) {
@@ -416,7 +448,7 @@ public final class ArenaManagementMenu implements Listener {
         int slot = event.getRawSlot();
 
         if (holder.screen == Screen.ARENAS) {
-            if (slot == 45) { openTemplates(player); return; }
+            if (slot == 45 || slot == 46) { openTemplates(player); return; }
             if (slot == 47 && editingReturnLocations.containsKey(player.getUniqueId())) { leaveTemplateEditing(player); return; }
             if (slot == 49) { openArenaList(player); return; }
             if (slot == 53) { player.closeInventory(); return; }
