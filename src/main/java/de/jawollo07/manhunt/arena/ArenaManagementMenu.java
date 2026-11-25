@@ -466,13 +466,11 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Gespeicherte Team-Spawnpunkte: §f" + teamSpawns,
                     "§7Mehrere Spawnpunkte pro Team sind möglich.",
                     "§eKlicken für die Team-Einrichtung"));
-            inventory.setItem(31, item(defaultSpawn && teamSpawns > 0 && template.valid()
-                            ? Material.EMERALD_BLOCK : Material.GRAY_DYE,
-                    defaultSpawn && teamSpawns > 0 && template.valid() ? "§aGrundsetup vollständig" : "§eSetup noch unvollständig",
-                    "§7Vorlage: " + (template.valid() ? "§aOK" : "§cFehler"),
-                    "§7Standard-Spawn: " + (defaultSpawn ? "§aOK" : "§cFehlt"),
-                    "§7Team-Spawns: " + (teamSpawns > 0 ? "§aVorhanden" : "§cFehlen"),
-                    "§7Die Modi-Prüfung erfolgt zusätzlich vor Spielstart."));
+            inventory.setItem(31, item(Material.BOOK,
+                    "§e5. Spielmodi & Abschlussprüfung",
+                    "§7Prüft jeden registrierten Spielmodus einzeln.",
+                    "§7Zeigt fehlende Pflicht-Spawns und Hinweise.",
+                    "§eKlicken für die vollständige Prüfung"));
             inventory.setItem(45, item(Material.ARROW, "§eZur Arena-Übersicht"));
             inventory.setItem(49, item(Material.SUNFLOWER, "§eFortschritt aktualisieren"));
             inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
@@ -510,17 +508,69 @@ public final class ArenaManagementMenu implements Listener {
             }
             long configuredTeams = java.util.Arrays.stream(keys)
                     .filter(key -> spawnCount(arena, "team:" + key) > 0).count();
-            inventory.setItem(31, item(configuredTeams == keys.length ? Material.EMERALD_BLOCK : Material.MAP,
+            inventory.setItem(31, item(Material.BOOK,
                     "§eTeam-Übersicht: " + configuredTeams + "/" + keys.length,
-                    "§7Für ein vollständiges Setup alle Teams einrichten.",
                     "§7Nicht benötigte Teams können übersprungen werden.",
-                    "§7Die Spielmodus-Prüfung erfolgt vor Spielstart."));
+                    "§7Welche Teams Pflicht sind, hängt vom Spielmodus ab.",
+                    "§eKlicken für die Spielmodus-Prüfung"));
             inventory.setItem(45, item(Material.ARROW, "§eZurück zum Arena-Setup"));
             inventory.setItem(49, item(Material.SUNFLOWER, "§eFortschritt aktualisieren"));
             inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
             player.openInventory(inventory);
         } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
             player.sendMessage("§cTeam-Setup konnte nicht geladen werden: " + exception.getMessage());
+            openSetup(player, arenaId);
+        }
+    }
+
+    /** Shows the actual readiness of every registered mode against this arena's saved layout. */
+    private void openSetupReview(Player player, String arenaId) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            var template = plugin.getMapManager().inspectTemplate(arena.worldName());
+            MenuHolder holder = new MenuHolder(Screen.REVIEW, arena.id(), null);
+            Inventory inventory = inventory(holder, "ManHunt • Arena prüfen");
+            inventory.setItem(4, item(template.valid() && !template.loaded()
+                            ? Material.EMERALD_BLOCK : Material.YELLOW_CONCRETE,
+                    "§eAbschlussprüfung: " + arena.displayName(),
+                    "§7Vorlage: " + (template.valid() ? "§aGültig" : "§cUngültig"),
+                    "§7Vorlagenwelt: " + (template.loaded() ? "§eNoch geladen – vor Spielstart entladen"
+                            : "§aNicht geladen"),
+                    "§7Standard-Spawn: " + (arena.spawnPoint("default").isPresent()
+                            ? "§aGesetzt" : "§eOptional – Weltspawn wird verwendet"),
+                    "§7Jeder Modus wird anhand seiner Pflicht-Spawnpunkte geprüft."));
+            int[] slots = {19, 21, 23, 25};
+            int index = 0;
+            boolean allReady = true;
+            for (var factory : plugin.getGameModeRegistry().getAll()) {
+                if (index >= slots.length) break;
+                var mode = factory.createSession();
+                ArenaValidation result = ArenaValidation.check(arena, mode, template.valid(), template.loaded());
+                allReady &= result.ready();
+                List<String> lore = new java.util.ArrayList<>();
+                lore.add("§7Status: " + (result.ready() ? "§aBereit" : "§cNicht bereit"));
+                lore.add("§7Benötigte Team-Spawns: §f"
+                        + (mode.getRequiredArenaSpawnPoints().isEmpty() ? "Keine – Weltspawn-Fallback"
+                        : String.join(", ", mode.getRequiredArenaSpawnPoints())));
+                result.errors().stream().limit(3).forEach(error -> lore.add("§c✗ " + error));
+                result.warnings().stream().limit(2).forEach(warning -> lore.add("§e! " + warning));
+                if (result.errors().isEmpty() && result.warnings().isEmpty()) lore.add("§aAlle Prüfungen bestanden.");
+                inventory.setItem(slots[index++], item(result.ready() ? Material.LIME_CONCRETE : Material.RED_CONCRETE,
+                        (result.ready() ? "§a" : "§c") + mode.getDisplayName(), lore.toArray(String[]::new)));
+            }
+            inventory.setItem(31, item(allReady ? Material.EMERALD_BLOCK : Material.YELLOW_CONCRETE,
+                    allReady ? "§aAlle Modi sind startbereit" : "§eEs gibt noch offene Punkte",
+                    "§7" + index + " Spielmodi geprüft.",
+                    "§7Eine Arena kann trotz offener Modi gespeichert bleiben.",
+                    "§7Nur der ausgewählte Modus muss vor Spielstart bereit sein."));
+            inventory.setItem(45, item(Material.ARROW, "§eZurück zum Team-Setup"));
+            inventory.setItem(49, item(Material.BOOK, "§eArena-Details öffnen",
+                    "§7Alle gespeicherten Spawnpunkte ansehen und testen."));
+            inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
+            player.openInventory(inventory);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cAbschlussprüfung fehlgeschlagen: " + exception.getMessage());
             openSetup(player, arenaId);
         }
     }
@@ -555,8 +605,8 @@ public final class ArenaManagementMenu implements Listener {
                     location.getZ(), location.getYaw(), location.getPitch());
             plugin.getArenaService().save(arena.withSpawnPoint(point));
             player.sendMessage("§aSpawnpunkt §e" + storedName + " §awurde an deiner Position gespeichert.");
-            if (storedName.equals("default")) openSetup(player, arenaId);
-            else openDetails(player, arenaId);
+            if (storedName.equals("default")) openTeamSetup(player, arenaId);
+            else openTeamSetup(player, arenaId);
         } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
             player.sendMessage("§cSpawnpunkt konnte nicht gespeichert werden: " + exception.getMessage());
         }
@@ -662,31 +712,18 @@ public final class ArenaManagementMenu implements Listener {
             }
             if (slot == 14) { setSpawn(player, holder.arenaId, "default"); return; }
             if (slot == 16) { openTeamSetup(player, holder.arenaId); return; }
-            if (slot == 31) {
-                try {
-                    Arena arena = plugin.getArenaService().find(holder.arenaId).orElseThrow();
-                    boolean ready = arena.spawnPoint("default").isPresent()
-                            && arena.spawnPoints().keySet().stream()
-                            .anyMatch(key -> key.toLowerCase(Locale.ROOT).startsWith("team:"))
-                            && plugin.getMapManager().inspectTemplate(arena.worldName()).valid();
-                    if (!ready) {
-                        player.sendMessage("§eBitte erledige zuerst alle offenen Setup-Schritte.");
-                        openSetup(player, holder.arenaId);
-                    } else {
-                        player.sendMessage("§aDas Grundsetup der Arena ist gespeichert. Die Spielmodus-Prüfung erfolgt vor Spielstart.");
-                        openDetails(player, holder.arenaId);
-                    }
-                } catch (SQLException | IllegalArgumentException exception) {
-                    player.sendMessage("§cSetup-Prüfung fehlgeschlagen: " + exception.getMessage());
-                }
-                return;
-            }
+            if (slot == 31) { openSetupReview(player, holder.arenaId); return; }
         } else if (holder.screen == Screen.TEAM_SETUP) {
             if (slot == 45) { openSetup(player, holder.arenaId); return; }
+            if (slot == 31) { openSetupReview(player, holder.arenaId); return; }
             if (slot == 49) { openTeamSetup(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String spawnName = holder.spawnActions.get(slot);
             if (spawnName != null) { setSpawn(player, holder.arenaId, spawnName); return; }
+        } else if (holder.screen == Screen.REVIEW) {
+            if (slot == 45) { openTeamSetup(player, holder.arenaId); return; }
+            if (slot == 49) { openDetails(player, holder.arenaId); return; }
+            if (slot == 53) { player.closeInventory(); return; }
         } else if (holder.screen == Screen.DETAILS) {
             if (slot == 51) { openDetails(player, holder.arenaId, holder.page - 1); return; }
             if (slot == 52) { openDetails(player, holder.arenaId, holder.page + 1); return; }
@@ -867,7 +904,7 @@ public final class ArenaManagementMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, DETAILS, CONFIRM }
+    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, REVIEW, DETAILS, CONFIRM }
     private enum InputAction { RENAME, CHANGE_TEMPLATE, DUPLICATE }
     private record PendingInput(String arenaId, InputAction action) { }
 
