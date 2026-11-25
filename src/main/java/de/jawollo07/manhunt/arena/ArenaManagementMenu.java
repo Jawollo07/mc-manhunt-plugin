@@ -933,14 +933,14 @@ public final class ArenaManagementMenu implements Listener {
                     () -> new IllegalStateException("Arena nicht gefunden."));
             switch (pending.action()) {
                 case RENAME -> {
-                    plugin.getArenaService().save(new Arena(arena.id(), value, arena.worldName(), arena.spawnPoints(), arena.enabledModeIds()));
+                    plugin.getArenaService().save(new Arena(arena.id(), value, arena.worldName(), arena.spawnPoints(), arena.enabledModeIds(), arena.modeSettings()));
                     player.sendMessage("§aAnzeigename wurde geändert.");
                     openDetails(player, pending.arenaId());
                 }
                 case CHANGE_TEMPLATE -> {
                     var template = plugin.getMapManager().inspectTemplate(value);
                     if (!template.valid()) throw new IllegalArgumentException("Keine gültige Vorlage: " + template.status());
-                    plugin.getArenaService().save(new Arena(arena.id(), arena.displayName(), value, java.util.Map.of(), arena.enabledModeIds()));
+                    plugin.getArenaService().save(new Arena(arena.id(), arena.displayName(), value, java.util.Map.of(), arena.enabledModeIds(), arena.modeSettings()));
                     player.sendMessage("§aKartenvorlage geändert. §eAlle bisherigen Spawnpunkte wurden zurückgesetzt, da sie zur alten Karte gehörten.");
                     if (template.loaded()) player.sendMessage("§eDie neue Vorlagenwelt muss vor Spielstart entladen werden.");
                     openDetails(player, pending.arenaId());
