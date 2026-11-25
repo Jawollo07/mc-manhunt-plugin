@@ -101,9 +101,14 @@ public final class LobbyMenu implements Listener {
                         .map(p -> java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(p.getUniqueId()).getName())
                                 .orElse(p.getUniqueId().toString().substring(0, 8)))
                         .toList();
-                inventory.setItem(slot++, item(Material.SHIELD, "§b" + teamKey + " §7(" + names.size() + ")",
+                inventory.setItem(slot++, item(Material.SHIELD, "§b" + lobbyTeamLabel(teamKey) + " §7(" + names.size() + ")",
                         names.isEmpty() ? "§8Noch niemand zugewiesen" : "§f" + String.join(", ", names)));
             }
+            long automatic = game.getPlayers().stream()
+                    .filter(p -> game.getLobbyTeamPreference(p.getUniqueId()).isEmpty()).count();
+            if (slot <= 44) inventory.setItem(slot++, item(Material.GRAY_DYE, "§7Automatische Verteilung §8(" + automatic + ")",
+                    "§7Diese Spieler werden beim Spielstart",
+                    "§7nach den Regeln des Modus verteilt."));
         }
         for (GamePlayer participant : game.getPlayers()) {
             if (slot > 44) break;
@@ -206,6 +211,17 @@ public final class LobbyMenu implements Listener {
             stack.setItemMeta(meta);
         }
         return stack;
+    }
+
+    private String lobbyTeamLabel(String key) {
+        return switch (key) {
+            case "hitmen" -> "Hitmen";
+            case "survivors" -> "Überlebende";
+            case "juggernaut" -> "Juggernaut";
+            case "hunters" -> "Jäger";
+            case "infected" -> "Infizierte";
+            default -> key;
+        };
     }
 
     private String stateName(GameState state) {
