@@ -184,7 +184,7 @@ public final class BuiltinGameModes {
             }
         }
 
-        protected long activeTeamCount(Game game, Team team) {
+        protected long countActiveTeamMembers(Game game, Team team) {
             return team.getMembers().stream().filter(id ->
                     game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).count();
         }
