@@ -350,7 +350,7 @@ public final class MapManager {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 if (Files.isSymbolicLink(file)) throw new IOException("Symbolic links are not allowed in map templates: " + file);
-                String relative = source.relativize(file).toString().replace('\\\\', '/');
+                String relative = source.relativize(file).toString().replace('\\', '/');
                 String name = file.getFileName().toString();
                 if (!name.equals("session.lock") && !name.equals("uid.dat")
                         && !relative.equals("data/paper/metadata.dat")) {
