@@ -57,6 +57,24 @@ class ArenaTest {
     }
 
     @Test
+    void storesModeSettingsAndPreservesThemAcrossArenaEditsAndCopies() {
+        Arena configured = new Arena("forest", "Forest", "map")
+                .withEnabledModes(java.util.Set.of("hitman", "juggernaut"))
+                .withModeSetting("HITMAN", "hitman_count", "2")
+                .withModeSetting("juggernaut", "ability_roar", "false")
+                .withSpawnPoint(new ArenaSpawnPoint("default", 0, 64, 0, 0, 0));
+
+        assertEquals(2, configured.modeIntSetting("hitman", "hitman_count", 0));
+        assertFalse(configured.modeBooleanSetting("juggernaut", "ability_roar", true));
+        assertEquals("fallback", configured.modeSetting("infection", "unknown", "fallback"));
+
+        Arena edited = configured.withoutSpawnPoint("default");
+        assertEquals(configured.enabledModeIds(), edited.enabledModeIds());
+        assertEquals(configured.modeSettings(), edited.modeSettings());
+        assertEquals(configured.modeSettings(), configured.copyAs("copy", "Copy").modeSettings());
+    }
+
+    @Test
     void rejectsInvalidSpawnPointKeysAndNonFiniteCoordinates() {
         assertThrows(IllegalArgumentException.class,
                 () -> new Arena("forest", "Forest", "map")
