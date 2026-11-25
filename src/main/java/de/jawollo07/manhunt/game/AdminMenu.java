@@ -145,23 +145,32 @@ public final class AdminMenu implements Listener {
     }
 
     private void openSettings(Player player, String modeId, String arenaId, int maxPlayers) {
+        openSettings(player, modeId, arenaId, maxPlayers, true);
+    }
+
+    private void openSettings(Player player, String modeId, String arenaId, int maxPlayers, boolean randomTeams) {
         int minimum = minimumFor(modeId);
-        MenuHolder holder = new MenuHolder(Screen.SETTINGS, modeId, arenaId, Math.max(minimum, maxPlayers));
+        MenuHolder holder = new MenuHolder(Screen.SETTINGS, modeId, arenaId, Math.max(minimum, maxPlayers), randomTeams);
         Inventory inventory = Bukkit.createInventory(holder, 27, Component.text("ManHunt • Spielerlimit"));
         holder.inventory = inventory;
         inventory.setItem(11, item(Material.REDSTONE, "§cWeniger Spieler", "§7Maximalspieler verringern"));
         inventory.setItem(13, item(Material.PLAYER_HEAD, "§eMaximalspieler: §f" + holder.maxPlayers,
                 "§7Mindestens: §f" + minimum, "§7Höchstens: §f32"));
         inventory.setItem(15, item(Material.EMERALD, "§aMehr Spieler", "§7Maximalspieler erhöhen"));
+        inventory.setItem(17, item(holder.randomTeams ? Material.LIME_DYE : Material.GRAY_DYE,
+                "§eZufällige Teams: " + (holder.randomTeams ? "§aAN" : "§cAUS"),
+                "§7AN: Spieler werden zufällig verteilt.",
+                "§7AUS: Reihenfolge des Lobby-Beitritts.", "§eKlicken zum Umschalten"));
         inventory.setItem(18, item(Material.ARROW, "§eZurück zur Arena-Auswahl"));
         inventory.setItem(22, item(Material.LIME_DYE, "§a§lLobby erstellen",
                 "§7Modus: §f" + modeId, "§7Arena: §f" + arenaId,
-                "§7Spielerlimit: §f" + holder.maxPlayers));
+                "§7Spielerlimit: §f" + holder.maxPlayers,
+                "§7Zufällige Teams: " + (holder.randomTeams ? "§aJa" : "§cNein")));
         inventory.setItem(26, item(Material.BARRIER, "§cSchließen"));
         player.openInventory(inventory);
     }
 
-    private void createGame(Player player, String modeId, String arenaId, int maxPlayers) {
+    private void createGame(Player player, String modeId, String arenaId, int maxPlayers, boolean randomTeams) {
         if (!player.hasPermission("manhunt.admin")) {
             player.sendMessage("§cDafür hast du keine Berechtigung.");
             return;
@@ -191,7 +200,8 @@ public final class AdminMenu implements Listener {
                     plugin.getConfigManager().getInt("game.countdown-seconds", 10),
                     plugin.getConfigManager().getInt("game.time-limit-seconds", 2400),
                     plugin.getConfigManager().getBoolean("game.allow-late-join", false),
-                    plugin.getConfigManager().getBoolean("game.allow-spectators", true)
+                    plugin.getConfigManager().getBoolean("game.allow-spectators", true),
+                    randomTeams
             );
             Game game = plugin.getGameManager().createGame(mode, arena, settings);
             plugin.getGameManager().transition(GameState.LOBBY);
@@ -268,11 +278,15 @@ public final class AdminMenu implements Listener {
                 int minimum = minimumFor(holder.modeId);
                 int updated = slot == 11 ? Math.max(minimum, holder.maxPlayers - 1)
                         : Math.min(32, holder.maxPlayers + 1);
-                openSettings(player, holder.modeId, holder.arenaId, updated);
+                openSettings(player, holder.modeId, holder.arenaId, updated, holder.randomTeams);
+                return;
+            }
+            if (slot == 17) {
+                openSettings(player, holder.modeId, holder.arenaId, holder.maxPlayers, !holder.randomTeams);
                 return;
             }
             if (slot == 22) {
-                createGame(player, holder.modeId, holder.arenaId, holder.maxPlayers);
+                createGame(player, holder.modeId, holder.arenaId, holder.maxPlayers, holder.randomTeams);
                 return;
             }
         }
@@ -316,14 +330,20 @@ public final class AdminMenu implements Listener {
         private final String modeId;
         private final String arenaId;
         private final int maxPlayers;
+        private final boolean randomTeams;
         private final Map<Integer, String> entries = new HashMap<>();
         private Inventory inventory;
 
         private MenuHolder(Screen screen, String modeId, String arenaId, int maxPlayers) {
+            this(screen, modeId, arenaId, maxPlayers, true);
+        }
+
+        private MenuHolder(Screen screen, String modeId, String arenaId, int maxPlayers, boolean randomTeams) {
             this.screen = screen;
             this.modeId = modeId;
             this.arenaId = arenaId;
             this.maxPlayers = maxPlayers;
+            this.randomTeams = randomTeams;
         }
 
         @Override public Inventory getInventory() { return inventory; }
