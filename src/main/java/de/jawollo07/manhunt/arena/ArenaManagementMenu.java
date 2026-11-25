@@ -534,6 +534,16 @@ public final class ArenaManagementMenu implements Listener {
                         "§7Die freigegebenen Spielmodi verwenden",
                         "§7den Weltspawn oder andere Spawnpunkte."));
             }
+            if (arena.supportsMode("hitman")) {
+                int extractionCount = spawnCount(arena, "extraction");
+                configured += extractionCount;
+                holder.spawnActions.put(16, "extraction");
+                inventory.setItem(16, item(extractionCount > 0 ? Material.LIME_DYE : Material.ENDER_EYE,
+                        "§eEvakuierungspunkt (optional)",
+                        "§7Status: " + (extractionCount > 0 ? "§aGesetzt" : "§7Nicht gesetzt"),
+                        "§7Hitman-Überlebende können hier entkommen.",
+                        "§eKlicken: Punkt an deiner Position setzen"));
+            }
             inventory.setItem(31, item(Material.BOOK, "§eTeam-Spawns: " + configured,
                     "§7Nur Pflicht-Teams der aktiven Modi werden gezeigt.",
                     "§eKlicken für die Abschlussprüfung"));
@@ -588,6 +598,21 @@ public final class ArenaManagementMenu implements Listener {
             player.sendMessage("§cSpielmodus-Auswahl konnte nicht geladen werden: " + exception.getMessage());
             openSetup(player, arenaId);
         }
+    }
+
+    private String modeSettingsSummary(Arena arena, String modeId) {
+        return switch (modeId.toLowerCase(Locale.ROOT)) {
+            case "assassin" -> "Zielverteilung "
+                    + settingValueLabel("target_distribution", arena.modeSetting(modeId, "target_distribution", "cycle"));
+            case "hitman" -> "Hitmen " + settingValueLabel("hitman_count", arena.modeSetting(modeId, "hitman_count", "0"))
+                    + ", Evakuierung " + settingValueLabel("extraction_enabled", arena.modeSetting(modeId, "extraction_enabled", "true"));
+            case "juggernaut" -> arena.modeSetting(modeId, "boss_health", "40") + " HP, "
+                    + (int) java.util.stream.Stream.of("ability_slam", "ability_charge", "ability_roar", "ability_regeneration")
+                            .filter(key -> arena.modeBooleanSetting(modeId, key, true)).count() + "/4 Fähigkeiten";
+            case "infection" -> "Start-Infizierte "
+                    + settingValueLabel("initial_infected", arena.modeSetting(modeId, "initial_infected", "0"));
+            default -> "Standard";
+        };
     }
 
     private Map<String, List<String>> modeSettingOptions(String modeId) {
@@ -766,6 +791,7 @@ public final class ArenaManagementMenu implements Listener {
                 lore.add("§7Benötigte Team-Spawns: §f"
                         + (mode.getRequiredArenaSpawnPoints().isEmpty() ? "Keine – Weltspawn-Fallback"
                         : String.join(", ", mode.getRequiredArenaSpawnPoints())));
+                lore.add("§7Arena-Einstellungen: §f" + modeSettingsSummary(arena, factory.getId()));
                 result.errors().stream().limit(3).forEach(error -> lore.add("§c✗ " + error));
                 result.warnings().stream().limit(2).forEach(warning -> lore.add("§e! " + warning));
                 if (result.errors().isEmpty() && result.warnings().isEmpty()) lore.add("§aAlle Prüfungen bestanden.");
