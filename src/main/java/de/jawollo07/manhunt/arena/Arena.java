@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-public record Arena(String id, String displayName, String worldName, Map<String, ArenaSpawnPoint> spawnPoints, java.util.Set<String> enabledModeIds) {
+public record Arena(String id, String displayName, String worldName, Map<String, ArenaSpawnPoint> spawnPoints, java.util.Set<String> enabledModeIds, Map<String, Map<String, String>> modeSettings) {
     public Arena {
         if (id == null || id.isBlank()) throw new IllegalArgumentException("Arena id must not be blank");
         if (displayName == null || displayName.isBlank()) throw new IllegalArgumentException("Arena display name must not be blank");
@@ -33,15 +33,34 @@ public record Arena(String id, String displayName, String worldName, Map<String,
             modes.add(modeId.trim().toLowerCase(java.util.Locale.ROOT));
         }
         enabledModeIds = Collections.unmodifiableSet(modes);
+        Objects.requireNonNull(modeSettings, "modeSettings");
+        Map<String, Map<String, String>> settingsCopy = new LinkedHashMap<>();
+        modeSettings.forEach((modeId, values) -> {
+            if (modeId == null || !modeId.trim().matches("[a-zA-Z0-9_-]{1,64}"))
+                throw new IllegalArgumentException("Invalid mode settings id: " + modeId);
+            Map<String, String> normalized = new LinkedHashMap<>();
+            Objects.requireNonNull(values, "mode setting values").forEach((key, value) -> {
+                if (key == null || !key.matches("[a-zA-Z0-9_-]{1,64}") || value == null || value.length() > 128)
+                    throw new IllegalArgumentException("Invalid mode setting: " + key);
+                normalized.put(key.toLowerCase(java.util.Locale.ROOT), value);
+            });
+            settingsCopy.put(modeId.toLowerCase(java.util.Locale.ROOT), Collections.unmodifiableMap(normalized));
+        });
+        modeSettings = Collections.unmodifiableMap(settingsCopy);
     }
 
     /** An empty mode set keeps legacy arenas compatible with every registered mode. */
+    public Arena(String id, String displayName, String worldName, Map<String, ArenaSpawnPoint> spawnPoints,
+                 java.util.Set<String> enabledModeIds) {
+        this(id, displayName, worldName, spawnPoints, enabledModeIds, Map.of());
+    }
+
     public Arena(String id, String displayName, String worldName, Map<String, ArenaSpawnPoint> spawnPoints) {
-        this(id, displayName, worldName, spawnPoints, java.util.Set.of());
+        this(id, displayName, worldName, spawnPoints, java.util.Set.of(), Map.of());
     }
 
     public Arena(String id, String displayName, String worldName) {
-        this(id, displayName, worldName, Map.of(), java.util.Set.of());
+        this(id, displayName, worldName, Map.of(), java.util.Set.of(), Map.of());
     }
 
     public boolean supportsMode(String modeId) {
@@ -49,7 +68,29 @@ public record Arena(String id, String displayName, String worldName, Map<String,
     }
 
     public Arena withEnabledModes(java.util.Set<String> modeIds) {
-        return new Arena(id, displayName, worldName, spawnPoints, modeIds);
+        return new Arena(id, displayName, worldName, spawnPoints, modeIds, modeSettings);
+    }
+
+    public String modeSetting(String modeId, String key, String defaultValue) {
+        return modeSettings.getOrDefault(modeId.toLowerCase(java.util.Locale.ROOT), Map.of())
+                .getOrDefault(key.toLowerCase(java.util.Locale.ROOT), defaultValue);
+    }
+
+    public int modeIntSetting(String modeId, String key, int defaultValue) {
+        try { return Integer.parseInt(modeSetting(modeId, key, Integer.toString(defaultValue))); }
+        catch (NumberFormatException ignored) { return defaultValue; }
+    }
+
+    public boolean modeBooleanSetting(String modeId, String key, boolean defaultValue) {
+        return Boolean.parseBoolean(modeSetting(modeId, key, Boolean.toString(defaultValue)));
+    }
+
+    public Arena withModeSetting(String modeId, String key, String value) {
+        Map<String, Map<String, String>> updated = new LinkedHashMap<>(modeSettings);
+        Map<String, String> values = new LinkedHashMap<>(updated.getOrDefault(modeId.toLowerCase(java.util.Locale.ROOT), Map.of()));
+        values.put(key.toLowerCase(java.util.Locale.ROOT), Objects.requireNonNull(value, "value"));
+        updated.put(modeId.toLowerCase(java.util.Locale.ROOT), values);
+        return new Arena(id, displayName, worldName, spawnPoints, enabledModeIds, updated);
     }
 
     public Optional<ArenaSpawnPoint> spawnPoint(String name) {
@@ -60,7 +101,7 @@ public record Arena(String id, String displayName, String worldName, Map<String,
         Objects.requireNonNull(point, "point");
         Map<String, ArenaSpawnPoint> updated = new LinkedHashMap<>(spawnPoints);
         updated.put(normalizeSpawnKey(point.name()), point);
-        return new Arena(id, displayName, worldName, updated);
+        return new Arena(id, displayName, worldName, updated, enabledModeIds, modeSettings);
     }
 
     public Arena withoutSpawnPoint(String name) {
@@ -71,7 +112,7 @@ public record Arena(String id, String displayName, String worldName, Map<String,
 
     /** Creates an independent arena entry using the same template and spawn layout. */
     public Arena copyAs(String newId, String newDisplayName) {
-        return new Arena(newId, newDisplayName, worldName, spawnPoints, enabledModeIds);
+        return new Arena(newId, newDisplayName, worldName, spawnPoints, enabledModeIds, modeSettings);
     }
 
     public static String normalizeSpawnKey(String name) {
