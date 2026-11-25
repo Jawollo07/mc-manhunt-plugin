@@ -218,8 +218,14 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         if (action.equals("tp")) {
             if (!(sender instanceof Player player)) throw new IllegalArgumentException("Dieser Befehl kann nur ingame ausgeführt werden.");
             org.bukkit.World world = plugin.getMapManager().getLoadedTemplateWorld(arena.worldName());
-            if (world == null) throw new IllegalStateException("Die Vorlagenwelt ist nicht geladen. Nutze /manhunt arena edit " + arena.worldName() + ".");
-            player.teleport(selected.toLocation(world));
+            if (world == null || !plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName())) {
+                plugin.getArenaManagementMenu().enterTemplateForEditing(player, arena.worldName());
+                world = plugin.getMapManager().getLoadedTemplateWorld(arena.worldName());
+            }
+            if (world == null) throw new IllegalStateException("Die Vorlagenwelt konnte nicht geladen werden.");
+            if (!player.teleport(selected.toLocation(world))) {
+                throw new IllegalStateException("Teleport zum Spawnpunkt fehlgeschlagen.");
+            }
             sender.sendMessage("§aZum Spawnpunkt §e" + team + " #" + index + " §ateleportiert.");
         } else if (action.equals("remove")) {
             Arena updated = arena.withoutSpawnPoint(selected.name());
