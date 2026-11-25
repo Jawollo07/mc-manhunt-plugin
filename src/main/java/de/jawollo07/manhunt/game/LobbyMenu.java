@@ -87,6 +87,24 @@ public final class LobbyMenu implements Listener {
                 "§7Freie Plätze: §f" + game.getAvailableSlots()));
 
         int slot = 9;
+        if (!game.getMode().getId().equalsIgnoreCase("assassin")) {
+            List<String> lobbyTeams = switch (game.getMode().getId().toLowerCase(java.util.Locale.ROOT)) {
+                case "hitman" -> List.of("hitmen", "survivors");
+                case "juggernaut" -> List.of("juggernaut", "hunters");
+                case "infection" -> List.of("infected", "survivors");
+                default -> List.of();
+            };
+            for (String teamKey : lobbyTeams) {
+                if (slot > 44) break;
+                List<String> names = game.getPlayers().stream()
+                        .filter(p -> game.getLobbyTeamPreference(p.getUniqueId()).orElse("").equals(teamKey))
+                        .map(p -> java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(p.getUniqueId()).getName())
+                                .orElse(p.getUniqueId().toString().substring(0, 8)))
+                        .toList();
+                inventory.setItem(slot++, item(Material.SHIELD, "§b" + teamKey + " §7(" + names.size() + ")",
+                        names.isEmpty() ? "§8Noch niemand zugewiesen" : "§f" + String.join(", ", names)));
+            }
+        }
         for (GamePlayer participant : game.getPlayers()) {
             if (slot > 44) break;
             OfflinePlayer offline = Bukkit.getOfflinePlayer(participant.getUniqueId());
