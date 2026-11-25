@@ -330,8 +330,24 @@ public final class MapManager {
 
     private Path dimensionsFolder() {
         World primary = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
-        Path levelFolder = primary == null ? worldContainer.resolve("world") : primary.getWorldFolder().toPath();
-        return levelFolder.toAbsolutePath().normalize().resolve("dimensions").normalize();
+        Path candidate = primary == null
+                ? worldContainer.resolve("world")
+                : primary.getWorldFolder().toPath().toAbsolutePath().normalize();
+
+        // On Paper 26.1+, getWorldFolder() may point at
+        // world/dimensions/minecraft/overworld rather than the level root.
+        // Walk upward to the directory containing the root level.dat.
+        for (Path current = candidate; current != null && current.startsWith(worldContainer);
+             current = current.getParent()) {
+            if (Files.isRegularFile(current.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS)) {
+                return current.resolve("dimensions").normalize();
+            }
+        }
+
+        // Fallback for setups where the primary world's root is not loaded
+        // or level.dat cannot currently be inspected.
+        Path namedRoot = worldContainer.resolve(primary == null ? "world" : primary.getName()).normalize();
+        return namedRoot.resolve("dimensions").normalize();
     }
 
     private Path dimensionFolder(NamespacedKey key) {
