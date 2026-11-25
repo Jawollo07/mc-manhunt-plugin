@@ -35,7 +35,7 @@ public record ArenaValidation(List<String> errors, List<String> warnings) {
         if (templateLoaded) errors.add("Die Kartenvorlage ist noch geladen und kann nicht kopiert werden.");
 
         for (String required : mode.getRequiredArenaSpawnPoints()) {
-            if (arena.spawnPoint(required).isEmpty()) {
+            if (!hasSpawnPoint(arena, required)) {
                 errors.add("Pflicht-Spawnpunkt fehlt: " + required);
             }
         }
@@ -45,12 +45,21 @@ public record ArenaValidation(List<String> errors, List<String> warnings) {
         }
 
         for (String recommended : recommendedFor(mode.getId())) {
-            if (arena.spawnPoint(recommended).isEmpty()) {
+            if (!hasSpawnPoint(arena, recommended)) {
                 warnings.add("Optionaler Spawnpunkt fehlt: " + recommended);
             }
         }
 
         return new ArenaValidation(errors, warnings);
+    }
+
+    private static boolean hasSpawnPoint(Arena arena, String key) {
+        if (key.startsWith("team:")) {
+            return arena.spawnPoints().keySet().stream().anyMatch(existing ->
+                    existing.equalsIgnoreCase(key)
+                            || existing.toLowerCase(java.util.Locale.ROOT).startsWith(key.toLowerCase(java.util.Locale.ROOT) + ":"));
+        }
+        return arena.spawnPoint(key).isPresent();
     }
 
     private static List<String> recommendedFor(String modeId) {
