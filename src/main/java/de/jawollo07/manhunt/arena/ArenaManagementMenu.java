@@ -36,6 +36,7 @@ public final class ArenaManagementMenu implements Listener {
     private final Map<UUID, PendingInput> pendingInputs = new ConcurrentHashMap<>();
     private final Map<UUID, Location> editingReturnLocations = new ConcurrentHashMap<>();
     private final Map<UUID, String> editingTemplateIds = new ConcurrentHashMap<>();
+    private final Map<UUID, String> setupArenaIds = new ConcurrentHashMap<>();
 
     public ArenaManagementMenu(ManHuntPlugin plugin) {
         this.plugin = plugin;
@@ -43,6 +44,18 @@ public final class ArenaManagementMenu implements Listener {
 
     public void open(Player player) {
         if (!allowed(player)) return;
+        String setupArenaId = setupArenaIds.get(player.getUniqueId());
+        if (setupArenaId != null) {
+            try {
+                if (plugin.getArenaService().find(setupArenaId).isPresent()) {
+                    openSetup(player, setupArenaId);
+                    return;
+                }
+            } catch (SQLException exception) {
+                player.sendMessage("§cGespeicherter Setup-Fortschritt konnte nicht geladen werden.");
+            }
+            setupArenaIds.remove(player.getUniqueId());
+        }
         openArenaList(player);
     }
 
@@ -423,6 +436,7 @@ public final class ArenaManagementMenu implements Listener {
         try {
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
                     () -> new IllegalStateException("Arena nicht gefunden."));
+            setupArenaIds.put(player.getUniqueId(), arena.id());
             var template = plugin.getMapManager().inspectTemplate(arena.worldName());
             boolean defaultSpawn = arena.spawnPoint("default").isPresent();
             long teamSpawns = arena.spawnPoints().keySet().stream()
@@ -474,6 +488,7 @@ public final class ArenaManagementMenu implements Listener {
         try {
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
                     () -> new IllegalStateException("Arena nicht gefunden."));
+            setupArenaIds.put(player.getUniqueId(), arena.id());
             String[] keys = {"hitmen", "survivors", "juggernaut", "hunters", "assassins", "infected"};
             String[] labels = {"Hitmen", "Überlebende", "Juggernaut", "Jäger", "Assassinen", "Infizierte"};
             Material[] icons = {Material.IRON_SWORD, Material.SHIELD, Material.NETHERITE_CHESTPLATE,
@@ -517,8 +532,13 @@ public final class ArenaManagementMenu implements Listener {
             if (!plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName())) {
                 player.sendMessage("§eDie passende Vorlagenwelt wird zum Setzen des Spawnpunkts geöffnet.");
                 enterTemplateForEditing(player, arena.worldName());
-                player.sendMessage("§7Gehe an die gewünschte Position und öffne anschließend §e/manhunt arenas"
-                        + " §7erneut. Wähle dieselbe Arena und klicke den Spawnpunkt nochmals an.");
+                player.sendMessage("§7Gehe an die gewünschte Position und klicke anschließend im wieder geöffneten Setup-Menü erneut auf das Team.");
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (player.isOnline()) {
+                        if (spawnName.equals("default")) openSetup(player, arenaId);
+                        else openTeamSetup(player, arenaId);
+                    }
+                }, 2L);
                 return;
             }
             var location = player.getLocation();
@@ -621,7 +641,11 @@ public final class ArenaManagementMenu implements Listener {
                 return;
             }
         } else if (holder.screen == Screen.SETUP) {
-            if (slot == 45) { openArenaList(player); return; }
+            if (slot == 45) {
+                setupArenaIds.remove(player.getUniqueId());
+                openArenaList(player);
+                return;
+            }
             if (slot == 49) { openSetup(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
             if (slot == 12) {
@@ -794,6 +818,7 @@ public final class ArenaManagementMenu implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
         editingReturnLocations.remove(playerId);
+        setupArenaIds.remove(playerId);
         String templateId = editingTemplateIds.remove(playerId);
         if (templateId == null) return;
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
