@@ -193,7 +193,7 @@ public final class MapManager {
         TemplateLocation location = resolveTemplate(templateId);
         if (location == null) {
             return new MapTemplate(templateId, false, getLoadedTemplateWorld(templateId) != null,
-                    "Weltordner fehlt oder enthält keine gültige level.dat");
+                    "Weltordner fehlt oder enthält keine gültige level.dat", "Nicht gefunden", "Unbekannt");
         }
         return inspectTemplate(location);
     }
@@ -201,9 +201,20 @@ public final class MapManager {
     private MapTemplate inspectTemplate(TemplateLocation location) {
         boolean valid = isValidWorldFolder(location.folder());
         boolean loaded = getLoadedTemplateWorld(location.id()) != null;
+        String modified = "Unbekannt";
+        try {
+            if (Files.exists(location.folder().resolve("level.dat"), LinkOption.NOFOLLOW_LINKS)) {
+                modified = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+                        .withZone(java.time.ZoneId.systemDefault())
+                        .format(Files.getLastModifiedTime(location.folder().resolve("level.dat")).toInstant());
+            }
+        } catch (IOException exception) {
+            plugin.getLogger().fine("Could not read template timestamp for " + location.id() + ": " + exception.getMessage());
+        }
         return new MapTemplate(location.id(), valid, loaded,
                 !valid ? "Weltordner fehlt oder enthält keine gültige level.dat"
-                        : loaded ? "Welt ist geladen – vor Spielstart entladen" : "Bereit");
+                        : loaded ? "Welt ist geladen – vor Spielstart entladen" : "Bereit",
+                location.folder().toAbsolutePath().normalize().toString(), modified);
     }
 
     public World loadTemplateForEditing(String templateId) throws IOException {
