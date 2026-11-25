@@ -47,6 +47,11 @@ public record Arena(String id, String displayName, String worldName, Map<String,
         return new Arena(id, displayName, worldName, updated);
     }
 
+    /** Creates an independent arena entry using the same template and spawn layout. */
+    public Arena copyAs(String newId, String newDisplayName) {
+        return new Arena(newId, newDisplayName, worldName, spawnPoints);
+    }
+
     public static String normalizeSpawnKey(String name) {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("Spawn point name must not be blank");
         String normalized = name.trim().toLowerCase(java.util.Locale.ROOT);
