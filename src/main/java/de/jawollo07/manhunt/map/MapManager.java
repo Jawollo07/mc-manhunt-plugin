@@ -46,6 +46,7 @@ public final class MapManager {
         requireServerThread();
         validateTemplateId(templateId);
         TemplateLocation template = resolveTemplate(templateId);
+        if (template != null) template = canonicalizeDimensionFolder(template);
         if (template == null || !isValidWorldFolder(template.folder())) {
             throw new IllegalArgumentException("Map template does not exist or is invalid: " + templateId);
         }
@@ -207,6 +208,7 @@ public final class MapManager {
         if (existing != null) return existing;
 
         TemplateLocation location = resolveTemplate(templateId);
+        location = canonicalizeDimensionFolder(location);
         WorldCreator creator = location.dimensionKey() == null
                 ? new WorldCreator(templateId) : WorldCreator.ofKey(location.dimensionKey());
         World world = Bukkit.createWorld(creator);
@@ -285,6 +287,24 @@ public final class MapManager {
         Path oneLevel = dimensionsFolder().resolve(templateId).normalize();
         if (isValidWorldFolder(oneLevel)) return new TemplateLocation(key.toString(), oneLevel, key);
         return null;
+    }
+
+    /**
+     * Paper 26.1+ expects dimensions/<namespace>/<key>. Move an older
+     * one-level dimensions/<key> folder into that canonical location before
+     * asking Bukkit to load it.
+     */
+    private TemplateLocation canonicalizeDimensionFolder(TemplateLocation location) throws IOException {
+        if (location == null || location.dimensionKey() == null) return location;
+        Path canonical = dimensionFolder(location.dimensionKey());
+        if (location.folder().equals(canonical)) return location;
+        if (Files.exists(canonical, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("Both legacy and namespaced folders exist for template " + location.id());
+        }
+        Files.createDirectories(canonical.getParent());
+        Files.move(location.folder(), canonical);
+        plugin.getLogger().info("Migrated map template " + location.id() + " to Paper's namespaced dimension folder");
+        return new TemplateLocation(location.id(), canonical, location.dimensionKey());
     }
 
     private Path dimensionsFolder() {
