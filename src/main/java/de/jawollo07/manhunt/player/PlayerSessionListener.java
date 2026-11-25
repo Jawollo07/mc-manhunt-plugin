@@ -57,5 +57,16 @@ public final class PlayerSessionListener implements Listener {
         if (game.getState() == GameState.ENDING || game.getState() == GameState.RESETTING) return;
 
         lifecycleService.playerQuit(player.getUniqueId());
+
+        // Lobby disconnects should free the slot immediately. Keeping an
+        // offline lobby member would allow the countdown to start with fewer
+        // actually available players than the configured minimum.
+        if (game.getState() == GameState.WAITING || game.getState() == GameState.LOBBY
+                || game.getState() == GameState.COUNTDOWN) {
+            gameManager.removePlayer(player.getUniqueId());
+            org.bukkit.Bukkit.broadcastMessage("§e[ManHunt] §7" + player.getName()
+                    + " hat die Lobby verlassen. §f" + game.getPlayerCount() + "/"
+                    + game.getSettings().maxPlayers() + " §7Spieler.");
+        }
     }
 }
