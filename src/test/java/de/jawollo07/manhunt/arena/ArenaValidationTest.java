@@ -60,6 +60,21 @@ class ArenaValidationTest {
     }
 
     @Test
+    void doesNotWarnAboutExtractionWhenHitmanEvacuationIsDisabled() {
+        Arena arena = new Arena("forest", "Forest", "forest")
+                .withModeSetting("hitman", "extraction_enabled", "false");
+        GameMode hitman = new GameMode() {
+            @Override public String getId() { return "hitman"; }
+            @Override public String getDisplayName() { return "Hitman"; }
+        };
+
+        ArenaValidation result = ArenaValidation.check(arena, hitman, true, false);
+
+        assertTrue(result.ready());
+        assertFalse(result.warnings().stream().anyMatch(message -> message.contains("extraction")));
+    }
+
+    @Test
     void rejectsInvalidOrAlreadyLoadedTemplates() {
         Arena arena = new Arena("forest", "Forest", "forest");
         GameMode mode = modeWithRequiredSpawn("default");
