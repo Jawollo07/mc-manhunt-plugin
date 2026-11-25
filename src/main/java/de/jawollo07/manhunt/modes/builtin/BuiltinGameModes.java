@@ -389,8 +389,10 @@ public final class BuiltinGameModes {
                         .filter(id -> game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false))
                         .filter(id -> {
                             Player player = Bukkit.getPlayer(id);
+                            double radius = Math.max(2, Math.min(12,
+                                    game.getArena().modeIntSetting(getId(), "extraction_radius", 4)));
                             return player != null && player.getWorld().equals(world)
-                                    && player.getLocation().distanceSquared(extraction) <= 16.0;
+                                    && player.getLocation().distanceSquared(extraction) <= radius * radius;
                         }).toList();
                 if (!escaped.isEmpty()) {
                     finish(game, GameOutcome.VICTORY, escaped, "Überlebende haben den Extraktionspunkt erreicht");
