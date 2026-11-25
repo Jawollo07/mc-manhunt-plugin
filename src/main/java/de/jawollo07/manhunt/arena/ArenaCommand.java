@@ -46,6 +46,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
                 case "info" -> info(sender, args);
                 case "setspawn" -> setSpawn(sender, args);
                 case "delspawn" -> deleteSpawn(sender, args);
+                case "spawn" -> spawn(sender, args);
                 default -> sendHelp(sender, label);
             }
         } catch (SQLException | java.io.IOException exception) {
@@ -147,6 +148,110 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§aSpawnpunkt wurde entfernt.");
     }
 
+
+    private void spawn(CommandSender sender, String[] args) throws SQLException {
+        if (args.length < 3) {
+            sender.sendMessage("§cVerwendung: /manhunt arena spawn <set|list|tp|remove|clear> <Arena> [Team] [Nummer]");
+            return;
+        }
+        String action = args[2].toLowerCase(Locale.ROOT);
+        if (action.equals("list")) {
+            requireArgs(args, 4, "Verwendung: /manhunt arena spawn list <Arena>");
+            Arena arena = requireArena(args[3]);
+            sender.sendMessage("§6Team-Spawnpunkte für §e" + arena.displayName() + "§6:");
+            boolean found = false;
+            for (String team : List.of("assassins", "hitmen", "survivors", "juggernaut", "hunters", "infected")) {
+                List<ArenaSpawnPoint> points = teamSpawnPoints(arena, team);
+                if (points.isEmpty()) continue;
+                found = true;
+                sender.sendMessage("§e" + team + "§7: " + points.stream()
+                        .map(point -> Integer.toString(spawnIndex(point.name())))
+                        .collect(java.util.stream.Collectors.joining(", ")));
+            }
+            if (!found) sender.sendMessage("§7Noch keine Team-Spawnpunkte gesetzt.");
+            return;
+        }
+        requireArgs(args, 5, "Verwendung: /manhunt arena spawn <set|tp|remove|clear> <Arena> <Team> [Nummer]");
+        Arena arena = requireArena(args[3]);
+        String team = normalizeTeam(args[4]);
+        if (action.equals("set")) {
+            if (!(sender instanceof Player player)) throw new IllegalArgumentException("Dieser Befehl kann nur ingame ausgeführt werden.");
+            if (!player.getWorld().getName().equals(arena.worldName())) {
+                throw new IllegalArgumentException("Du musst dich in der Vorlagenwelt " + arena.worldName() + " befinden. Nutze /manhunt arena edit " + arena.worldName() + ".");
+            }
+            int next = teamSpawnPoints(arena, team).stream().mapToInt(point -> spawnIndex(point.name())).max().orElse(0) + 1;
+            Location location = player.getLocation();
+            ArenaSpawnPoint point = new ArenaSpawnPoint("team:" + team + ":" + next,
+                    location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
+            plugin.getArenaService().save(arena.withSpawnPoint(point));
+            sender.sendMessage("§aTeam-Spawn §e" + team + " #" + next + " §agespeichert.");
+            return;
+        }
+        if (action.equals("clear")) {
+            Arena updated = arena;
+            for (ArenaSpawnPoint point : teamSpawnPoints(arena, team)) updated = updated.withoutSpawnPoint(point.name());
+            plugin.getArenaService().save(updated);
+            sender.sendMessage("§aAlle Spawnpunkte von §e" + team + " §awurden entfernt.");
+            return;
+        }
+        requireArgs(args, 6, "Verwendung: /manhunt arena spawn <tp|remove> <Arena> <Team> <Nummer>");
+        int index;
+        try { index = Integer.parseInt(args[5]); }
+        catch (NumberFormatException exception) { throw new IllegalArgumentException("Die Nummer muss eine ganze Zahl sein."); }
+        if (index < 1) throw new IllegalArgumentException("Die Nummer muss mindestens 1 sein.");
+        List<ArenaSpawnPoint> points = teamSpawnPoints(arena, team);
+        ArenaSpawnPoint selected = points.stream().filter(point -> spawnIndex(point.name()) == index)
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("Dieser Team-Spawnpunkt existiert nicht."));
+        if (action.equals("tp")) {
+            if (!(sender instanceof Player player)) throw new IllegalArgumentException("Dieser Befehl kann nur ingame ausgeführt werden.");
+            org.bukkit.World world = plugin.getServer().getWorld(arena.worldName());
+            if (world == null) throw new IllegalStateException("Die Vorlagenwelt ist nicht geladen. Nutze /manhunt arena edit " + arena.worldName() + ".");
+            player.teleport(selected.toLocation(world));
+            sender.sendMessage("§aZum Spawnpunkt §e" + team + " #" + index + " §ateleportiert.");
+        } else if (action.equals("remove")) {
+            Arena updated = arena.withoutSpawnPoint(selected.name());
+            List<ArenaSpawnPoint> remaining = teamSpawnPoints(updated, team);
+            for (ArenaSpawnPoint point : remaining) updated = updated.withoutSpawnPoint(point.name());
+            for (int i = 0; i < remaining.size(); i++) {
+                ArenaSpawnPoint point = remaining.get(i);
+                updated = updated.withSpawnPoint(new ArenaSpawnPoint("team:" + team + ":" + (i + 1),
+                        point.x(), point.y(), point.z(), point.yaw(), point.pitch()));
+            }
+            plugin.getArenaService().save(updated);
+            sender.sendMessage("§aSpawnpunkt entfernt; Nummerierung wurde aktualisiert.");
+        } else {
+            sender.sendMessage("§cUnbekannte Aktion. Nutze set, list, tp, remove oder clear.");
+        }
+    }
+
+    private Arena requireArena(String id) throws SQLException {
+        return plugin.getArenaService().find(id).orElseThrow(
+                () -> new IllegalArgumentException("Arena nicht gefunden: " + id));
+    }
+
+    private String normalizeTeam(String value) {
+        String team = value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "");
+        if (!List.of("assassins", "hitmen", "survivors", "juggernaut", "hunters", "infected").contains(team)) {
+            throw new IllegalArgumentException("Unbekanntes Team. Erlaubt: assassins, hitmen, survivors, juggernaut, hunters, infected.");
+        }
+        return team;
+    }
+
+    private List<ArenaSpawnPoint> teamSpawnPoints(Arena arena, String team) {
+        return arena.spawnPoints().values().stream()
+                .filter(point -> point.name().equalsIgnoreCase("team:" + team)
+                        || point.name().toLowerCase(Locale.ROOT).startsWith("team:" + team + ":"))
+                .sorted(java.util.Comparator.comparingInt(point -> spawnIndex(point.name())))
+                .toList();
+    }
+
+    private int spawnIndex(String name) {
+        int separator = name.lastIndexOf(':');
+        if (separator < 0) return 1;
+        try { return Integer.parseInt(name.substring(separator + 1)); }
+        catch (NumberFormatException exception) { return 1; }
+    }
+
     private void openGui(CommandSender sender) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("§cDieses Menü kann nur ingame geöffnet werden.");
@@ -239,6 +344,10 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/" + label + " arena delete <id>");
         sender.sendMessage("§e/" + label + " arena info <id>");
         sender.sendMessage("§e/" + label + " arena setspawn <id> <default|team:name>");
+        sender.sendMessage("§e/" + label + " arena spawn set <arena> <team> §7(Nummer automatisch)");
+        sender.sendMessage("§e/" + label + " arena spawn list <arena>");
+        sender.sendMessage("§e/" + label + " arena spawn tp|remove <arena> <team> <nummer>");
+        sender.sendMessage("§e/" + label + " arena spawn clear <arena> <team>");
         sender.sendMessage("§e/" + label + " arena delspawn <id> <spawnname>");
     }
 
@@ -247,7 +356,19 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         if (!sender.hasPermission("manhunt.admin")) return List.of();
         if (args.length == 1) return filter(List.of("arena"), args[0]);
         if (args.length == 2 && args[0].equalsIgnoreCase("arena")) {
-            return filter(List.of("gui", "edit", "leave", "templates", "list", "create", "delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn"), args[1]);
+            return filter(List.of("gui", "edit", "leave", "templates", "list", "create", "delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn", "spawn"), args[1]);
+        }
+
+        if (args.length == 3 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("spawn")) {
+            return filter(List.of("set", "list", "tp", "remove", "clear"), args[2]);
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("spawn")) {
+            try { return filter(plugin.getArenaService().findAll().stream().map(Arena::id).toList(), args[3]); }
+            catch (SQLException exception) { return List.of(); }
+        }
+        if (args.length == 5 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("spawn")
+                && !args[2].equalsIgnoreCase("list")) {
+            return filter(List.of("assassins", "hitmen", "survivors", "juggernaut", "hunters", "infected"), args[4]);
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("edit")) {
             try {
