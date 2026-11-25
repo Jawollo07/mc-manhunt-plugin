@@ -209,6 +209,8 @@ public final class ArenaManagementMenu implements Listener {
                         "§eLinksklick: Spawnpunkt entfernen",
                         "§eRechtsklick: Position in Vorlagenwelt testen"));
             }
+            inventory.setItem(44, item(Material.BOOK, "§eZurück zum Arena-Setup",
+                    "§7Fortschritt ansehen und Einrichtung fortsetzen."));
             inventory.setItem(45, item(Material.ARROW, "§eZurück"));
             inventory.setItem(46, item(Material.WRITABLE_BOOK, "§aArena duplizieren",
                     "§7Kopiert diese Arena inklusive",
@@ -492,7 +494,8 @@ public final class ArenaManagementMenu implements Listener {
                     location.getZ(), location.getYaw(), location.getPitch());
             plugin.getArenaService().save(arena.withSpawnPoint(point));
             player.sendMessage("§aSpawnpunkt §e" + storedName + " §awurde an deiner Position gespeichert.");
-            openDetails(player, arenaId);
+            if (storedName.equals("default")) openSetup(player, arenaId);
+            else openDetails(player, arenaId);
         } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
             player.sendMessage("§cSpawnpunkt konnte nicht gespeichert werden: " + exception.getMessage());
         }
@@ -584,6 +587,9 @@ public final class ArenaManagementMenu implements Listener {
                 try {
                     Arena arena = plugin.getArenaService().find(holder.arenaId).orElseThrow();
                     enterTemplateForEditing(player, arena.worldName());
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        if (player.isOnline()) openSetup(player, holder.arenaId);
+                    }, 2L);
                 } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
                     player.sendMessage("§cVorlagenwelt konnte nicht geöffnet werden: " + exception.getMessage());
                 }
@@ -613,6 +619,7 @@ public final class ArenaManagementMenu implements Listener {
         } else if (holder.screen == Screen.DETAILS) {
             if (slot == 51) { openDetails(player, holder.arenaId, holder.page - 1); return; }
             if (slot == 52) { openDetails(player, holder.arenaId, holder.page + 1); return; }
+            if (slot == 44) { openSetup(player, holder.arenaId); return; }
             if (slot == 45) { openArenaList(player); return; }
             if (slot == 46) {
                 pendingInputs.put(player.getUniqueId(), new PendingInput(holder.arenaId, InputAction.DUPLICATE));
