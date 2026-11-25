@@ -73,56 +73,54 @@ public final class LobbyMenu implements Listener {
             return;
         }
 
+        long onlineCount = game.getPlayers().stream()
+                .filter(participant -> Bukkit.getPlayer(participant.getUniqueId()) != null).count();
+        int required = game.getSettings().minPlayers();
+        boolean enoughPlayers = onlineCount >= required;
         inventory.setItem(2, item(Material.CLOCK, "§6" + stateName(game.getState()),
                 "§7Status: §f" + game.getState(),
                 game.getState() == GameState.COUNTDOWN
                         ? "§eStart in: §f" + Math.max(0, game.getCountdownRemainingSeconds()) + " Sekunden"
-                        : "§7Warte auf den Spielstart."));
+                        : "§7" + (enoughPlayers ? "Genug Spieler – Start möglich." : "Es fehlen noch "
+                                + Math.max(0, required - (int) onlineCount) + " Spieler.")));
         inventory.setItem(4, item(Material.COMPASS, "§e" + game.getMode().getDisplayName(),
                 "§7Spielmodus: §f" + game.getMode().getId(),
-                "§7Arena: §f" + game.getArena().displayName()));
-        inventory.setItem(6, item(Material.PLAYER_HEAD, "§aSpieler: §f" + game.getPlayerCount()
+                "§7Arena: §f" + game.getArena().displayName(),
+                "§7Teams: §f" + teamSummary(game)));
+        inventory.setItem(6, item(Material.PLAYER_HEAD, "§aSpieler: §f" + onlineCount
                         + "§7/§f" + game.getSettings().maxPlayers(),
-                "§7Mindestens benötigt: §f" + game.getSettings().minPlayers(),
-                "§7Freie Plätze: §f" + game.getAvailableSlots()));
+                "§7Mindestens benötigt: §f" + required,
+                "§7Freie Plätze: §f" + game.getAvailableSlots(),
+                "§7Offline-Spieler werden in der Lobby nicht mitgezählt."));
+
+        Material readiness = enoughPlayers ? Material.LIME_CONCRETE : Material.YELLOW_CONCRETE;
+        inventory.setItem(13, item(readiness,
+                enoughPlayers ? "§aBereit für den Spielstart" : "§eWarte auf weitere Spieler",
+                "§7Online: §f" + onlineCount + "§7/§f" + required + " §7benötigt",
+                game.getState() == GameState.COUNTDOWN
+                        ? "§eCountdown: §f" + Math.max(0, game.getCountdownRemainingSeconds()) + "s"
+                        : enoughPlayers ? "§7Der Countdown startet automatisch."
+                        : "§7Sobald genug Spieler online sind,",
+                game.getState() == GameState.COUNTDOWN && onlineCount < required
+                        ? "§cDer Countdown wird bei zu wenigen Spielern pausiert."
+                        : "§7kann der Countdown beginnen."));
 
         int slot = 9;
-        if (!game.getMode().getId().equalsIgnoreCase("assassin")) {
-            List<String> lobbyTeams = switch (game.getMode().getId().toLowerCase(java.util.Locale.ROOT)) {
-                case "hitman" -> List.of("hitmen", "survivors");
-                case "juggernaut" -> List.of("juggernaut", "hunters");
-                case "infection" -> List.of("infected", "survivors");
-                default -> List.of();
-            };
-            for (String teamKey : lobbyTeams) {
-                if (slot > 44) break;
-                List<String> names = game.getPlayers().stream()
-                        .filter(p -> game.getLobbyTeamPreference(p.getUniqueId()).orElse("").equals(teamKey))
-                        .map(p -> java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(p.getUniqueId()).getName())
-                                .orElse(p.getUniqueId().toString().substring(0, 8)))
-                        .toList();
-                inventory.setItem(slot++, item(Material.SHIELD, "§b" + lobbyTeamLabel(teamKey) + " §7(" + names.size() + ")",
-                        names.isEmpty() ? "§8Noch niemand zugewiesen" : "§f" + String.join(", ", names)));
-            }
-            long automatic = game.getPlayers().stream()
-                    .filter(p -> game.getLobbyTeamPreference(p.getUniqueId()).isEmpty()).count();
-            if (slot <= 44) inventory.setItem(slot++, item(Material.GRAY_DYE, "§7Automatische Verteilung §8(" + automatic + ")",
-                    "§7Diese Spieler werden beim Spielstart",
-                    "§7nach den Regeln des Modus verteilt."));
-        }
         for (GamePlayer participant : game.getPlayers()) {
             if (slot > 44) break;
             OfflinePlayer offline = Bukkit.getOfflinePlayer(participant.getUniqueId());
             String name = offline.getName();
             if (name == null) name = participant.getUniqueId().toString().substring(0, 8);
+            boolean online = offline.isOnline();
             ItemStack head = new ItemStack(Material.PLAYER_HEAD);
             if (head.getItemMeta() instanceof SkullMeta meta) {
                 meta.setOwningPlayer(offline);
-                meta.setDisplayName("§a" + name);
+                meta.setDisplayName((online ? "§a" : "§7") + name);
                 List<String> lore = new ArrayList<>();
-                lore.add(offline.isOnline() ? "§aOnline" : "§7Offline");
+                lore.add(online ? "§aOnline – bereit für die Runde" : "§cOffline – nicht startberechtigt");
                 String teamPreference = game.getLobbyTeamPreference(participant.getUniqueId()).orElse("");
-                lore.add("§7Team: §f" + (teamPreference.isEmpty() ? "Automatisch" : lobbyTeamLabel(teamPreference)));
+                lore.add("§7Teamwunsch: §f" + (teamPreference.isEmpty() ? "Automatisch" : lobbyTeamLabel(teamPreference)));
+                lore.add("§7Status: §f" + participant.getStatus());
                 meta.setLore(lore);
                 head.setItemMeta(meta);
             }
@@ -152,8 +150,37 @@ public final class LobbyMenu implements Listener {
             inventory.setItem(ADMIN_SLOT, item(Material.COMMAND_BLOCK, "§cAdmin-Menü",
                     "§7Runde verwalten oder eine neue Runde vorbereiten."));
         }
+        inventory.setItem(47, item(Material.SHIELD, "§bTeamübersicht",
+                teamLore(game).toArray(String[]::new)));
         inventory.setItem(REFRESH_SLOT, item(Material.CLOCK, "§eAktualisieren",
                 "§7Spielerliste und Status neu laden."));
+    }
+
+    private String teamSummary(Game game) {
+        return teamLore(game).stream().map(line -> line.replace("§7", "").replace("§f", ""))
+                .collect(java.util.stream.Collectors.joining(" | "));
+    }
+
+    private List<String> teamLore(Game game) {
+        List<String> teams = switch (game.getMode().getId().toLowerCase(java.util.Locale.ROOT)) {
+            case "hitman" -> List.of("hitmen", "survivors");
+            case "juggernaut" -> List.of("juggernaut", "hunters");
+            case "infection" -> List.of("infected", "survivors");
+            default -> List.of();
+        };
+        if (teams.isEmpty()) return List.of("§7Dieser Modus hat keine festen Teams.");
+        List<String> lines = new ArrayList<>();
+        for (String key : teams) {
+            long count = game.getPlayers().stream()
+                    .filter(participant -> game.getLobbyTeamPreference(participant.getUniqueId())
+                            .orElse("").equals(key)).count();
+            lines.add("§7" + lobbyTeamLabel(key) + ": §f" + count + " zugewiesen");
+        }
+        long automatic = game.getPlayers().stream()
+                .filter(participant -> game.getLobbyTeamPreference(participant.getUniqueId()).isEmpty()).count();
+        lines.add("§7Automatische Verteilung: §f" + automatic);
+        lines.add("§8Wunschzuweisungen können im Admin-Menü geändert werden.");
+        return lines;
     }
 
     @EventHandler
