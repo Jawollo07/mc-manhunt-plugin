@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Mode-aware arena checks. Optional spawn points improve layouts but never block casual rounds. */
+/** Mode-aware arena checks. Every active team needs a configured spawn; extraction remains optional. */
 public record ArenaValidation(List<String> errors, List<String> warnings) {
     private static final Map<String, List<String>> RECOMMENDED = Map.of(
             "hitman", List.of("extraction")
