@@ -462,10 +462,17 @@ public final class ArenaManagementMenu implements Listener {
                     "§7" + (defaultSpawn ? "§aGesetzt" : "§cNoch nicht gesetzt"),
                     "§7Wird an deiner aktuellen Position gespeichert.",
                     "§eKlicken zum Setzen"));
-            inventory.setItem(16, item(teamSpawns > 0 ? Material.LIME_DYE : Material.CHEST,
-                    "§a4. Team-Spawnpunkte einrichten",
+            int enabledModes = arena.enabledModeIds().isEmpty()
+                    ? plugin.getGameModeRegistry().getAll().size() : arena.enabledModeIds().size();
+            inventory.setItem(16, item(enabledModes > 0 ? Material.LIME_DYE : Material.NAME_TAG,
+                    "§a4. Spielmodi freigeben",
+                    "§7Freigegebene Modi: §f" + enabledModes,
+                    "§7Lege fest, welche Modi diese Karte nutzen dürfen.",
+                    "§eKlicken zur Auswahl"));
+            inventory.setItem(30, item(teamSpawns > 0 ? Material.LIME_DYE : Material.CHEST,
+                    "§a5. Team-Spawnpunkte einrichten",
                     "§7Gespeicherte Team-Spawnpunkte: §f" + teamSpawns,
-                    "§7Mehrere Spawnpunkte pro Team sind möglich.",
+                    "§7Es werden nur benötigte Teams angezeigt.",
                     "§eKlicken für die Team-Einrichtung"));
             int enabledModes = arena.enabledModeIds().isEmpty()
                     ? plugin.getGameModeRegistry().getAll().size() : arena.enabledModeIds().size();
@@ -489,45 +496,61 @@ public final class ArenaManagementMenu implements Listener {
         }
     }
 
-    /** Dedicated wizard step for assigning spawn locations to the supported teams. */
+    /** Shows only the team spawn points required by this arena's enabled modes. */
     private void openTeamSetup(Player player, String arenaId) {
         try {
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
                     () -> new IllegalStateException("Arena nicht gefunden."));
             setupArenaIds.put(player.getUniqueId(), arena.id());
-            String[] keys = {"hitmen", "survivors", "juggernaut", "hunters", "assassins", "infected"};
-            String[] labels = {"Hitmen", "Überlebende", "Juggernaut", "Jäger", "Assassinen", "Infizierte"};
-            Material[] icons = {Material.IRON_SWORD, Material.SHIELD, Material.NETHERITE_CHESTPLATE,
-                    Material.BOW, Material.DIAMOND_SWORD, Material.ROTTEN_FLESH};
+            java.util.Set<String> teamKeys = new java.util.LinkedHashSet<>();
+            for (var factory : plugin.getGameModeRegistry().getAll()) {
+                if (!arena.supportsMode(factory.getId())) continue;
+                for (String required : factory.createSession().getRequiredArenaSpawnPoints()) {
+                    if (required.startsWith("team:")) teamKeys.add(required);
+                }
+            }
+            Map<String, String> labels = Map.of(
+                    "hitmen", "Hitmen", "survivors", "Überlebende", "juggernaut", "Juggernaut",
+                    "hunters", "Jäger", "assassins", "Assassinen", "infected", "Infizierte");
+            Map<String, Material> icons = Map.of(
+                    "hitmen", Material.IRON_SWORD, "survivors", Material.SHIELD,
+                    "juggernaut", Material.NETHERITE_CHESTPLATE, "hunters", Material.BOW,
+                    "assassins", Material.DIAMOND_SWORD, "infected", Material.ROTTEN_FLESH);
             MenuHolder holder = new MenuHolder(Screen.TEAM_SETUP, arena.id(), null);
             Inventory inventory = inventory(holder, "ManHunt • Team-Spawns");
-            inventory.setItem(4, item(Material.CHEST, "§e4. Team-Spawnpunkte einrichten",
-                    "§7Wähle nacheinander die Teams aus.",
-                    "§7Jeder Klick speichert einen weiteren Spawnpunkt.",
-                    "§7Mehrere Positionen pro Team sind möglich."));
-            for (int i = 0; i < keys.length; i++) {
-                String key = "team:" + keys[i];
+            inventory.setItem(4, item(Material.CHEST, "§e5. Team-Spawnpunkte einrichten",
+                    "§7Hier erscheinen nur Teams, die von den",
+                    "§7freigegebenen Spielmodi benötigt werden.",
+                    "§7Klick fügt einen weiteren Spawnpunkt hinzu."));
+            int slot = 10;
+            int configured = 0;
+            for (String key : teamKeys) {
+                if (slot > 43) break;
+                String teamId = key.substring("team:".length());
+                String label = labels.getOrDefault(teamId, teamId.substring(0, 1).toUpperCase(Locale.ROOT) + teamId.substring(1));
                 int count = spawnCount(arena, key);
-                inventory.setItem(10 + i, item(count > 0 ? Material.LIME_DYE : icons[i],
-                        (count > 0 ? "§a" : "§e") + labels[i],
+                configured += count;
+                holder.spawnActions.put(slot, key);
+                inventory.setItem(slot++, item(count > 0 ? Material.LIME_DYE : icons.getOrDefault(teamId, Material.IRON_SWORD),
+                        (count > 0 ? "§a" : "§e") + label,
                         "§7Gespeicherte Spawnpunkte: §f" + count,
                         "§eKlicken: Spawnpunkt an deiner Position hinzufügen"));
-                holder.spawnActions.put(10 + i, key);
             }
-            long configuredTeams = java.util.Arrays.stream(keys)
-                    .filter(key -> spawnCount(arena, "team:" + key) > 0).count();
-            inventory.setItem(31, item(Material.BOOK,
-                    "§eTeam-Übersicht: " + configuredTeams + "/" + keys.length,
-                    "§7Nicht benötigte Teams können übersprungen werden.",
-                    "§7Welche Teams Pflicht sind, hängt vom Spielmodus ab.",
-                    "§eKlicken für die Spielmodus-Prüfung"));
-            inventory.setItem(45, item(Material.ARROW, "§eZurück zum Arena-Setup"));
+            if (teamKeys.isEmpty()) {
+                inventory.setItem(22, item(Material.LIME_CONCRETE, "§aKeine Team-Spawns erforderlich",
+                        "§7Die freigegebenen Spielmodi verwenden",
+                        "§7den Weltspawn oder andere Spawnpunkte."));
+            }
+            inventory.setItem(31, item(Material.BOOK, "§eTeam-Spawns: " + configured,
+                    "§7Nur Pflicht-Teams der aktiven Modi werden gezeigt.",
+                    "§eKlicken für die Abschlussprüfung"));
+            inventory.setItem(45, item(Material.ARROW, "§eZurück zur Modusauswahl"));
             inventory.setItem(49, item(Material.SUNFLOWER, "§eFortschritt aktualisieren"));
             inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
             player.openInventory(inventory);
         } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
             player.sendMessage("§cTeam-Setup konnte nicht geladen werden: " + exception.getMessage());
-            openSetup(player, arenaId);
+            openModeSetup(player, arenaId);
         }
     }
 
@@ -541,7 +564,7 @@ public final class ArenaManagementMenu implements Listener {
                     new java.util.ArrayList<>(plugin.getGameModeRegistry().getAll());
             MenuHolder holder = new MenuHolder(Screen.MODE_SETUP, arena.id(), null);
             Inventory inventory = inventory(holder, "ManHunt • Spielmodi freigeben");
-            inventory.setItem(4, item(Material.NAME_TAG, "§e5. Unterstützte Spielmodi",
+            inventory.setItem(4, item(Material.NAME_TAG, "§e4. Unterstützte Spielmodi",
                     "§7Grün = freigegeben, grau = deaktiviert.",
                     "§7Änderungen werden sofort gespeichert.",
                     "§7Leere alte Einstellung bedeutet: alle Modi."));
@@ -563,6 +586,8 @@ public final class ArenaManagementMenu implements Listener {
             inventory.setItem(31, item(Material.BOOK, "§e" + selected.size() + " Modi freigegeben",
                     "§7Mindestens ein Spielmodus muss aktiv bleiben.",
                     "§7Die Spawn-Prüfung berücksichtigt nur diese Modi."));
+            inventory.setItem(31, item(Material.BOOK, "§eWeiter: Team-Spawnpunkte",
+                    "§7Nur Teams der freigegebenen Modi werden angezeigt."));
             inventory.setItem(45, item(Material.ARROW, "§eZurück zum Arena-Setup"));
             inventory.setItem(49, item(Material.SUNFLOWER, "§eAktualisieren"));
             inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
@@ -688,7 +713,7 @@ public final class ArenaManagementMenu implements Listener {
                     location.getZ(), location.getYaw(), location.getPitch());
             plugin.getArenaService().save(arena.withSpawnPoint(point));
             player.sendMessage("§aSpawnpunkt §e" + storedName + " §awurde an deiner Position gespeichert.");
-            if (storedName.equals("default")) openTeamSetup(player, arenaId);
+            if (storedName.equals("default")) openModeSetup(player, arenaId);
             else openTeamSetup(player, arenaId);
         } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
             player.sendMessage("§cSpawnpunkt konnte nicht gespeichert werden: " + exception.getMessage());
@@ -794,12 +819,12 @@ public final class ArenaManagementMenu implements Listener {
                 return;
             }
             if (slot == 14) { setSpawn(player, holder.arenaId, "default"); return; }
-            if (slot == 16) { openTeamSetup(player, holder.arenaId); return; }
-            if (slot == 30) { openModeSetup(player, holder.arenaId); return; }
+            if (slot == 16) { openModeSetup(player, holder.arenaId); return; }
+            if (slot == 30) { openTeamSetup(player, holder.arenaId); return; }
             if (slot == 32) { openSetupReview(player, holder.arenaId); return; }
         } else if (holder.screen == Screen.TEAM_SETUP) {
             if (slot == 45) { openSetup(player, holder.arenaId); return; }
-            if (slot == 31) { openModeSetup(player, holder.arenaId); return; }
+            if (slot == 31) { openSetupReview(player, holder.arenaId); return; }
             if (slot == 49) { openTeamSetup(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String spawnName = holder.spawnActions.get(slot);
