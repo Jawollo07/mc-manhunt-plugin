@@ -53,6 +53,24 @@ public final class ArenaRepository {
                     }
                     insertMode.executeBatch();
                 }
+                try (PreparedStatement deleteSettings = connection.prepareStatement(
+                        "DELETE FROM arena_mode_settings WHERE arena_id = ?")) {
+                    deleteSettings.setString(1, arena.id());
+                    deleteSettings.executeUpdate();
+                }
+                try (PreparedStatement insertSetting = connection.prepareStatement(
+                        "INSERT INTO arena_mode_settings (arena_id, mode_id, setting_key, setting_value) VALUES (?, ?, ?, ?)")) {
+                    for (Map.Entry<String, Map<String, String>> mode : arena.modeSettings().entrySet()) {
+                        for (Map.Entry<String, String> setting : mode.getValue().entrySet()) {
+                            insertSetting.setString(1, arena.id());
+                            insertSetting.setString(2, mode.getKey());
+                            insertSetting.setString(3, setting.getKey());
+                            insertSetting.setString(4, setting.getValue());
+                            insertSetting.addBatch();
+                        }
+                    }
+                    insertSetting.executeBatch();
+                }
                 try (PreparedStatement delete = connection.prepareStatement(
                         "DELETE FROM arena_spawn_points WHERE arena_id = ?")) {
                     delete.setString(1, arena.id());
@@ -157,6 +175,19 @@ public final class ArenaRepository {
                 while (result.next()) enabledModes.add(result.getString("mode_id"));
             }
         }
-        return new Arena(id, displayName, worldName, points, enabledModes);
+        Map<String, Map<String, String>> modeSettings = new LinkedHashMap<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT mode_id, setting_key, setting_value
+                FROM arena_mode_settings WHERE arena_id = ? ORDER BY mode_id, setting_key
+                """)) {
+            statement.setString(1, id);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    modeSettings.computeIfAbsent(result.getString("mode_id"), ignored -> new LinkedHashMap<>())
+                            .put(result.getString("setting_key"), result.getString("setting_value"));
+                }
+            }
+        }
+        return new Arena(id, displayName, worldName, points, enabledModes, modeSettings);
     }
 }
