@@ -623,6 +623,7 @@ public final class ArenaManagementMenu implements Listener {
             case "hitman" -> {
                 options.put("hitman_count", List.of("0", "1", "2", "3"));
                 options.put("extraction_enabled", List.of("true", "false"));
+                options.put("extraction_radius", List.of("2", "4", "6", "8", "12"));
             }
             case "juggernaut" -> {
                 options.put("boss_health", List.of("20", "30", "40", "60"));
@@ -643,6 +644,7 @@ public final class ArenaManagementMenu implements Listener {
             case "target_distribution" -> "Zielverteilung";
             case "hitman_count" -> "Anzahl Hitmen";
             case "extraction_enabled" -> "Evakuierung";
+            case "extraction_radius" -> "Evakuierungsradius";
             case "boss_health" -> "Juggernaut-Leben";
             case "ability_slam" -> "Ground Slam";
             case "ability_charge" -> "Charge";
@@ -661,6 +663,7 @@ public final class ArenaManagementMenu implements Listener {
         if (key.equals("hitman_count") || key.equals("initial_infected"))
             return value.equals("0") ? "Automatisch" : value;
         if (key.equals("boss_health")) return value + " HP";
+        if (key.equals("extraction_radius")) return value + " Blöcke";
         if (key.equals("target_distribution")) return value.equals("random") ? "Zufällig" : "Kreisförmig";
         return value.equals("true") ? "Aktiv" : "Deaktiviert";
     }
@@ -686,6 +689,8 @@ public final class ArenaManagementMenu implements Listener {
                     case "target_distribution" -> "cycle";
                     case "hitman_count", "initial_infected" -> "0";
                     case "boss_health" -> "40";
+                case "extraction_radius" -> "4";
+                    case "extraction_radius" -> "4";
                     default -> "true";
                 };
                 holder.entries.put(slot, key);
