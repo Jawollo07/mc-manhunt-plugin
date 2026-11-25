@@ -469,6 +469,47 @@ public final class ArenaManagementMenu implements Listener {
         }
     }
 
+    /** Dedicated wizard step for assigning spawn locations to the supported teams. */
+    private void openTeamSetup(Player player, String arenaId) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            String[] keys = {"hitmen", "survivors", "juggernaut", "hunters", "assassins", "infected"};
+            String[] labels = {"Hitmen", "Überlebende", "Juggernaut", "Jäger", "Assassinen", "Infizierte"};
+            Material[] icons = {Material.IRON_SWORD, Material.SHIELD, Material.NETHERITE_CHESTPLATE,
+                    Material.BOW, Material.DIAMOND_SWORD, Material.ROTTEN_FLESH};
+            MenuHolder holder = new MenuHolder(Screen.TEAM_SETUP, arena.id(), null);
+            Inventory inventory = inventory(holder, "ManHunt • Team-Spawns");
+            inventory.setItem(4, item(Material.CHEST, "§e4. Team-Spawnpunkte einrichten",
+                    "§7Wähle nacheinander die Teams aus.",
+                    "§7Jeder Klick speichert einen weiteren Spawnpunkt.",
+                    "§7Mehrere Positionen pro Team sind möglich."));
+            for (int i = 0; i < keys.length; i++) {
+                String key = "team:" + keys[i];
+                int count = spawnCount(arena, key);
+                inventory.setItem(10 + i, item(count > 0 ? Material.LIME_DYE : icons[i],
+                        (count > 0 ? "§a" : "§e") + labels[i],
+                        "§7Gespeicherte Spawnpunkte: §f" + count,
+                        "§eKlicken: Spawnpunkt an deiner Position hinzufügen"));
+                holder.spawnActions.put(10 + i, key);
+            }
+            long configuredTeams = java.util.Arrays.stream(keys)
+                    .filter(key -> spawnCount(arena, "team:" + key) > 0).count();
+            inventory.setItem(31, item(configuredTeams == keys.length ? Material.EMERALD_BLOCK : Material.MAP,
+                    "§eTeam-Übersicht: " + configuredTeams + "/" + keys.length,
+                    "§7Für ein vollständiges Setup alle Teams einrichten.",
+                    "§7Nicht benötigte Teams können übersprungen werden.",
+                    "§7Die Spielmodus-Prüfung erfolgt vor Spielstart."));
+            inventory.setItem(45, item(Material.ARROW, "§eZurück zum Arena-Setup"));
+            inventory.setItem(49, item(Material.SUNFLOWER, "§eFortschritt aktualisieren"));
+            inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
+            player.openInventory(inventory);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cTeam-Setup konnte nicht geladen werden: " + exception.getMessage());
+            openSetup(player, arenaId);
+        }
+    }
+
     private void setSpawn(Player player, String arenaId, String spawnName) {
         try {
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
@@ -596,7 +637,7 @@ public final class ArenaManagementMenu implements Listener {
                 return;
             }
             if (slot == 14) { setSpawn(player, holder.arenaId, "default"); return; }
-            if (slot == 16) { openDetails(player, holder.arenaId); return; }
+            if (slot == 16) { openTeamSetup(player, holder.arenaId); return; }
             if (slot == 31) {
                 try {
                     Arena arena = plugin.getArenaService().find(holder.arenaId).orElseThrow();
@@ -616,6 +657,12 @@ public final class ArenaManagementMenu implements Listener {
                 }
                 return;
             }
+        } else if (holder.screen == Screen.TEAM_SETUP) {
+            if (slot == 45) { openSetup(player, holder.arenaId); return; }
+            if (slot == 49) { openTeamSetup(player, holder.arenaId); return; }
+            if (slot == 53) { player.closeInventory(); return; }
+            String spawnName = holder.spawnActions.get(slot);
+            if (spawnName != null) { setSpawn(player, holder.arenaId, spawnName); return; }
         } else if (holder.screen == Screen.DETAILS) {
             if (slot == 51) { openDetails(player, holder.arenaId, holder.page - 1); return; }
             if (slot == 52) { openDetails(player, holder.arenaId, holder.page + 1); return; }
@@ -795,7 +842,7 @@ public final class ArenaManagementMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, DETAILS, CONFIRM }
+    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, DETAILS, CONFIRM }
     private enum InputAction { RENAME, CHANGE_TEMPLATE, DUPLICATE }
     private record PendingInput(String arenaId, InputAction action) { }
 
