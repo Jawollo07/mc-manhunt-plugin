@@ -59,6 +59,42 @@ public final class BuiltinGameModes {
         @Override public void onStart(Game game) {
             startedAt = Instant.now();
             for (GamePlayer participant : game.getPlayers()) participant.setStatus(PlayerStatus.PLAYING);
+            announceRoundSettings(game);
+        }
+
+        private void announceRoundSettings(Game game) {
+            String mode = getId();
+            int configuredLimit = game.getArena().modeIntSetting(mode, "time_limit_seconds", 0);
+            int limit = configuredLimit > 0 ? configuredLimit : game.getSettings().timeLimitSeconds();
+            String time = limit > 0 ? (limit / 60) + " Minuten" : "unbegrenzt";
+            List<String> details = new ArrayList<>();
+            details.add("Zeitlimit: " + time);
+            switch (mode.toLowerCase(java.util.Locale.ROOT)) {
+                case "assassin" -> details.add("Zielverteilung: "
+                        + (game.getArena().modeSetting(mode, "target_distribution", "cycle").equalsIgnoreCase("random")
+                        ? "zufällig" : "kreisförmig"));
+                case "hitman" -> {
+                    int hitmen = game.getArena().modeIntSetting(mode, "hitman_count", 0);
+                    details.add("Hitmen: " + (hitmen <= 0 ? "automatisch" : hitmen));
+                    boolean extraction = game.getArena().modeBooleanSetting(mode, "extraction_enabled", true);
+                    details.add("Evakuierung: " + (extraction ? "aktiv" : "deaktiviert"));
+                    if (extraction) details.add("Radius: "
+                            + game.getArena().modeIntSetting(mode, "extraction_radius", 4) + " Blöcke");
+                }
+                case "juggernaut" -> {
+                    int hp = game.getArena().modeIntSetting(mode, "boss_health", 40);
+                    long abilities = java.util.stream.Stream.of(
+                                    "ability_slam", "ability_charge", "ability_roar", "ability_regeneration")
+                            .filter(key -> game.getArena().modeBooleanSetting(mode, key, true)).count();
+                    details.add("Juggernaut: " + hp + " HP, " + abilities + "/4 Fähigkeiten");
+                }
+                case "infection" -> {
+                    int infected = game.getArena().modeIntSetting(mode, "initial_infected", 0);
+                    details.add("Start-Infizierte: " + (infected <= 0 ? "automatisch" : infected));
+                }
+                default -> { }
+            }
+            announce("Rundenregeln – " + String.join(" | ", details));
         }
 
         protected List<UUID> activePlayers(Game game) {
