@@ -262,6 +262,18 @@ public final class AdminMenu implements Listener {
                 String current = active.getLobbyTeamPreference(playerId).orElse("");
                 int index = keys.indexOf(current);
                 String next = index + 1 >= keys.size() ? "" : keys.get(index + 1);
+                if (!next.isEmpty()) {
+                    int limit = teamPreferenceLimit(active, next);
+                    long assigned = active.getPlayers().stream()
+                            .filter(p -> !p.getUniqueId().equals(playerId))
+                            .filter(p -> active.getLobbyTeamPreference(p.getUniqueId()).orElse("").equals(next))
+                            .count();
+                    if (assigned >= limit) {
+                        player.sendMessage("§cDieses Team ist bereits vollständig (" + limit + " Spieler).");
+                        openTeamAssignments(player);
+                        return;
+                    }
+                }
                 active.setLobbyTeamPreference(playerId, next.isEmpty() ? null : next);
                 openTeamAssignments(player);
             }
@@ -386,6 +398,14 @@ public final class AdminMenu implements Listener {
             case "juggernaut" -> List.of("", "juggernaut", "hunters");
             case "infection" -> List.of("", "infected", "survivors");
             default -> List.of("");
+        };
+    }
+
+    private int teamPreferenceLimit(Game game, String key) {
+        return switch (key) {
+            case "juggernaut" -> 1;
+            case "hitmen", "infected" -> game.getPlayerCount() >= 7 ? 2 : 1;
+            default -> game.getSettings().maxPlayers();
         };
     }
 
