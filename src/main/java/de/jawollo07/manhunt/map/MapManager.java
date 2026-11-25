@@ -1,6 +1,7 @@
 package de.jawollo07.manhunt.map;
 
 import org.bukkit.Bukkit;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -13,25 +14,23 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-/**
- * Creates isolated, disposable copies of map templates.
- *
- * All public methods must be invoked on the Paper server thread because world
- * creation, lookup and unloading are Bukkit operations. File copying/deletion
- * is deliberately performed in the same call so a partially copied world can
- * never be loaded by another task.
- */
+/** Manages disposable map copies and supports legacy plus Paper 26.1+ world storage. */
 public final class MapManager {
-    private static final Pattern TEMPLATE_ID = Pattern.compile("[a-zA-Z0-9_-]{1,48}");
+    private static final Pattern LEGACY_ID = Pattern.compile("[a-zA-Z0-9_.-]{1,48}");
+    private static final Pattern NAMESPACE = Pattern.compile("[a-z0-9_.-]{1,48}");
+    private static final Pattern KEY = Pattern.compile("[a-z0-9/._-]{1,48}");
 
     private final JavaPlugin plugin;
     private final Path worldContainer;
@@ -43,52 +42,52 @@ public final class MapManager {
         this.worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
     }
 
-    /**
-     * Copies a world folder from the server world container and loads the copy.
-     * The template must be an unloaded world folder, not the currently active
-     * default world or another loaded world.
-     */
     public MapInstance createWorkingCopy(String templateId) throws IOException {
         requireServerThread();
         validateTemplateId(templateId);
-
-        Path template = worldContainer.resolve(templateId).normalize();
-        if (!template.getParent().equals(worldContainer)) {
-            throw new IllegalArgumentException("Template path is outside the world container");
+        TemplateLocation template = resolveTemplate(templateId);
+        if (template == null || !isValidWorldFolder(template.folder())) {
+            throw new IllegalArgumentException("Map template does not exist or is invalid: " + templateId);
         }
-        if (!Files.isDirectory(template, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(template)) {
-            throw new IllegalArgumentException("Map template does not exist or is not a directory: " + templateId);
-        }
-        if (Bukkit.getWorld(templateId) != null) {
+        if (getLoadedTemplateWorld(templateId) != null) {
             throw new IllegalStateException("Map template must be unloaded before it can be copied: " + templateId);
-        }
-        if (!Files.isRegularFile(template.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS)) {
-            throw new IllegalArgumentException("Map template is missing level.dat: " + templateId);
         }
 
         UUID instanceId = UUID.randomUUID();
-        String worldName = "manhunt_" + templateId.toLowerCase(Locale.ROOT) + "_"
-                + instanceId.toString().replace("-", "").substring(0, 12);
-        Path destination = worldContainer.resolve(worldName).normalize();
-        if (!destination.getParent().equals(worldContainer) || Files.exists(destination, LinkOption.NOFOLLOW_LINKS)) {
-            throw new IOException("Temporary world destination already exists or is invalid: " + worldName);
+        String suffix = instanceId.toString().replace("-", "").substring(0, 12);
+        String worldName;
+        Path destination;
+        WorldCreator creator;
+        if (template.dimensionKey() != null) {
+            NamespacedKey instanceKey = new NamespacedKey("manhunt", "instance_" + suffix);
+            worldName = instanceKey.toString();
+            destination = dimensionFolder(instanceKey);
+            creator = WorldCreator.ofKey(instanceKey);
+        } else {
+            worldName = "manhunt_" + templateId.toLowerCase(Locale.ROOT) + "_" + suffix;
+            destination = worldContainer.resolve(worldName).normalize();
+            creator = new WorldCreator(worldName);
+        }
+
+        if (!isSafeDestination(destination) || Files.exists(destination, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("Temporary world destination already exists or is invalid: " + destination);
         }
 
         boolean loaded = false;
         try {
-            copyWorldFolder(template, destination);
-            World world = Bukkit.createWorld(new WorldCreator(worldName));
-            if (world == null) {
-                throw new IOException("Paper could not load temporary world: " + worldName);
-            }
+            copyWorldFolder(template.folder(), destination);
+            World world = Bukkit.createWorld(creator);
+            if (world == null) throw new IOException("Paper could not load temporary world: " + worldName);
             loaded = true;
-            MapInstance instance = new MapInstance(instanceId, templateId, worldName, Instant.now());
+            MapInstance instance = new MapInstance(instanceId, templateId, world.getName(), Instant.now());
             instances.put(instanceId, new LoadedMap(instance, destination, world.getUID()));
-            plugin.getLogger().info("Created temporary map " + worldName + " from template " + templateId);
+            plugin.getLogger().info("Created temporary map " + world.getName() + " from template " + templateId);
             return instance;
         } catch (RuntimeException | IOException exception) {
             if (loaded) {
-                Bukkit.unloadWorld(worldName, false);
+                World world = template.dimensionKey() == null
+                        ? Bukkit.getWorld(worldName) : Bukkit.getWorld(creator.key());
+                if (world != null) Bukkit.unloadWorld(world, false);
             }
             deleteRecursively(destination);
             throw exception;
@@ -99,42 +98,27 @@ public final class MapManager {
         requireServerThread();
         LoadedMap loaded = requireTracked(instance);
         World world = Bukkit.getWorld(loaded.worldUid());
-        if (world == null) {
-            throw new IllegalStateException("Temporary map is no longer loaded: " + instance.worldName());
-        }
+        if (world == null) throw new IllegalStateException("Temporary map is no longer loaded: " + instance.worldName());
         return world;
     }
 
-    /**
-     * Unloads and deletes a managed temporary world. Refuses to delete while
-     * players are still inside it; callers must restore/teleport them first.
-     */
     public void deleteWorkingCopy(MapInstance instance) throws IOException {
         requireServerThread();
         LoadedMap loaded = requireTracked(instance);
         World world = Bukkit.getWorld(loaded.worldUid());
         if (world != null) {
-            if (!world.getPlayers().isEmpty()) {
-                throw new IllegalStateException("Cannot delete temporary map while players are still inside it");
-            }
-            if (!Bukkit.unloadWorld(world, true)) {
-                throw new IllegalStateException("Paper refused to unload temporary world: " + instance.worldName());
-            }
+            if (!world.getPlayers().isEmpty()) throw new IllegalStateException("Cannot delete temporary map while players are still inside it");
+            if (!Bukkit.unloadWorld(world, true)) throw new IllegalStateException("Paper refused to unload temporary world: " + instance.worldName());
         }
-
         deleteRecursively(loaded.folder());
         instances.remove(instance.id(), loaded);
         plugin.getLogger().info("Deleted temporary map " + instance.worldName());
     }
 
-    /**
-     * Best-effort shutdown cleanup. Players must have been restored/teleported
-     * out before this method is called.
-     */
     public void deleteAllWorkingCopies() throws IOException {
         requireServerThread();
         IOException failure = null;
-        for (LoadedMap loaded : java.util.List.copyOf(instances.values())) {
+        for (LoadedMap loaded : List.copyOf(instances.values())) {
             try {
                 deleteWorkingCopy(loaded.instance());
             } catch (IOException | RuntimeException exception) {
@@ -145,98 +129,106 @@ public final class MapManager {
         if (failure != null) throw failure;
     }
 
-    /**
-     * Lists world folders in the server world container as candidate templates.
-     * ManHunt working copies are intentionally excluded.
-     */
-    public java.util.List<MapTemplate> listTemplates() throws IOException {
+    /** Finds legacy worlds in the server root and namespaced worlds below the primary world's dimensions folder. */
+    public List<MapTemplate> listTemplates() throws IOException {
         requireServerThread();
-        java.util.List<MapTemplate> templates = new java.util.ArrayList<>();
-        if (!Files.isDirectory(worldContainer, LinkOption.NOFOLLOW_LINKS)) return java.util.List.of();
-        try (var entries = Files.list(worldContainer)) {
-            for (Path folder : entries.filter(path -> Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
-                    .filter(path -> !Files.isSymbolicLink(path))
-                    .filter(path -> !path.getFileName().toString().startsWith("manhunt_"))
-                    .filter(path -> !path.getFileName().toString().startsWith("."))
-                    // Only real Minecraft worlds belong in the template picker;
-                    // server folders such as config, libraries, logs, etc. have no level.dat.
-                    .filter(path -> Files.isRegularFile(path.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS))
-                    .sorted(java.util.Comparator.comparing(path -> path.getFileName().toString().toLowerCase(Locale.ROOT)))
-                    .toList()) {
-                String id = folder.getFileName().toString();
-                if (!TEMPLATE_ID.matcher(id).matches()) continue;
-                templates.add(inspectTemplate(id));
+        Map<String, TemplateLocation> found = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+
+        if (Files.isDirectory(worldContainer, LinkOption.NOFOLLOW_LINKS)) {
+            try (var entries = Files.list(worldContainer)) {
+                for (Path folder : entries
+                        .filter(path -> Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
+                        .filter(path -> !Files.isSymbolicLink(path))
+                        .filter(path -> !path.getFileName().toString().startsWith("manhunt_"))
+                        .filter(path -> !path.getFileName().toString().startsWith("."))
+                        .filter(MapManager::isValidWorldFolder).toList()) {
+                    String id = folder.getFileName().toString();
+                    if (LEGACY_ID.matcher(id).matches()) found.put(id, new TemplateLocation(id, folder, null));
+                }
             }
         }
-        return java.util.List.copyOf(templates);
+
+        Path dimensions = dimensionsFolder();
+        if (Files.isDirectory(dimensions, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(dimensions)) {
+            try (var firstLevel = Files.list(dimensions)) {
+                for (Path first : firstLevel
+                        .filter(path -> Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
+                        .filter(path -> !Files.isSymbolicLink(path)).toList()) {
+                    String firstName = first.getFileName().toString();
+
+                    // Also recognize a one-level dimensions/<world> folder used by some migrated setups.
+                    if (isValidWorldFolder(first) && KEY.matcher(firstName).matches()) {
+                        NamespacedKey key = NamespacedKey.minecraft(firstName);
+                        found.put(key.toString(), new TemplateLocation(key.toString(), first, key));
+                        continue;
+                    }
+
+                    if (!NAMESPACE.matcher(firstName).matches()) continue;
+                    try (var secondLevel = Files.list(first)) {
+                        for (Path folder : secondLevel
+                                .filter(path -> Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
+                                .filter(path -> !Files.isSymbolicLink(path))
+                                .filter(MapManager::isValidWorldFolder).toList()) {
+                            String keyName = folder.getFileName().toString();
+                            if (!KEY.matcher(keyName).matches()) continue;
+                            NamespacedKey key = new NamespacedKey(firstName, keyName);
+                            found.put(key.toString(), new TemplateLocation(key.toString(), folder, key));
+                        }
+                    }
+                }
+            }
+        }
+
+        List<MapTemplate> templates = new ArrayList<>();
+        found.values().stream()
+                .sorted(Comparator.comparing(location -> location.id().toLowerCase(Locale.ROOT)))
+                .forEach(location -> templates.add(inspectTemplate(location)));
+        return List.copyOf(templates);
     }
 
-    /** Inspects a candidate without loading it or modifying any files. */
     public MapTemplate inspectTemplate(String templateId) {
         requireServerThread();
         validateTemplateId(templateId);
-        Path folder = worldContainer.resolve(templateId).normalize();
-        if (!folder.getParent().equals(worldContainer) || Files.isSymbolicLink(folder)
-                || !Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS)) {
-            return new MapTemplate(templateId, false, false, "Ordner fehlt oder ist kein sicherer Weltordner");
+        TemplateLocation location = resolveTemplate(templateId);
+        if (location == null || !isValidWorldFolder(location.folder())) {
+            return new MapTemplate(templateId, false, getLoadedTemplateWorld(templateId) != null,
+                    "Weltordner fehlt oder enthält keine gültige level.dat");
         }
-        if (!Files.isRegularFile(folder.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS)) {
-            return new MapTemplate(templateId, false, Bukkit.getWorld(templateId) != null,
-                    "level.dat fehlt – keine gültige Minecraft-Welt");
-        }
-        boolean loaded = Bukkit.getWorld(templateId) != null;
+        boolean loaded = getLoadedTemplateWorld(templateId) != null;
         return new MapTemplate(templateId, true, loaded,
                 loaded ? "Welt ist geladen – vor Spielstart entladen" : "Bereit");
     }
 
-    /**
-     * Loads an original template world for an administrator to edit.
-     * Only worlds loaded by this method are tracked for later editor cleanup;
-     * worlds that were already loaded by the server are never unloaded by us.
-     */
     public World loadTemplateForEditing(String templateId) throws IOException {
         requireServerThread();
         MapTemplate template = inspectTemplate(templateId);
-        if (!template.valid()) {
-            throw new IllegalArgumentException("Invalid map template: " + template.status());
-        }
-        World existing = Bukkit.getWorld(templateId);
+        if (!template.valid()) throw new IllegalArgumentException("Invalid map template: " + template.status());
+        World existing = getLoadedTemplateWorld(templateId);
         if (existing != null) return existing;
 
-        World world = Bukkit.createWorld(new WorldCreator(templateId));
-        if (world == null) {
-            throw new IOException("Paper could not load map template: " + templateId);
-        }
+        TemplateLocation location = resolveTemplate(templateId);
+        WorldCreator creator = location.dimensionKey() == null
+                ? new WorldCreator(templateId) : WorldCreator.ofKey(location.dimensionKey());
+        World world = Bukkit.createWorld(creator);
+        if (world == null) throw new IOException("Paper could not load map template: " + templateId);
         editorLoadedTemplates.add(templateId.toLowerCase(Locale.ROOT));
         plugin.getLogger().info("Loaded map template for editing: " + templateId);
         return world;
     }
 
-    /**
-     * Unloads a template only if this manager loaded it for editing.
-     * It refuses to unload while any player remains inside the world.
-     *
-     * @return true when the world was unloaded (or was already absent), false
-     * when the world was loaded before an editing session began.
-     */
     public boolean unloadTemplateAfterEditing(String templateId) {
         requireServerThread();
         validateTemplateId(templateId);
         String key = templateId.toLowerCase(Locale.ROOT);
         if (!editorLoadedTemplates.contains(key)) return false;
-
-        World world = Bukkit.getWorld(templateId);
+        World world = getLoadedTemplateWorld(templateId);
         if (world == null) {
             editorLoadedTemplates.remove(key);
             return true;
         }
-        if (!world.getPlayers().isEmpty()) {
-            throw new IllegalStateException("Players are still inside template world: " + templateId);
-        }
+        if (!world.getPlayers().isEmpty()) throw new IllegalStateException("Players are still inside template world: " + templateId);
         world.save();
-        if (!Bukkit.unloadWorld(world, true)) {
-            throw new IllegalStateException("Paper refused to unload template world: " + templateId);
-        }
+        if (!Bukkit.unloadWorld(world, true)) throw new IllegalStateException("Paper refused to unload template world: " + templateId);
         editorLoadedTemplates.remove(key);
         plugin.getLogger().info("Unloaded edited map template: " + templateId);
         return true;
@@ -247,8 +239,87 @@ public final class MapManager {
         return templateId != null && editorLoadedTemplates.contains(templateId.toLowerCase(Locale.ROOT));
     }
 
+    public World getLoadedTemplateWorld(String templateId) {
+        requireServerThread();
+        if (templateId == null || templateId.isBlank()) return null;
+        if (templateId.contains(":")) {
+            NamespacedKey key = parseDimensionKey(templateId);
+            return key == null ? null : Bukkit.getWorld(key);
+        }
+        return Bukkit.getWorld(templateId);
+    }
+
+    public boolean isTemplateWorld(World world, String templateId) {
+        requireServerThread();
+        if (world == null || templateId == null) return false;
+        if (templateId.contains(":")) {
+            NamespacedKey key = parseDimensionKey(templateId);
+            return key != null && world.getKey().equals(key);
+        }
+        return world.getName().equalsIgnoreCase(templateId);
+    }
+
     public int getActiveInstanceCount() {
         return instances.size();
+    }
+
+    private TemplateLocation resolveTemplate(String templateId) {
+        if (templateId.contains(":")) {
+            NamespacedKey key = parseDimensionKey(templateId);
+            if (key == null) return null;
+            Path folder = dimensionFolder(key);
+            if (isValidWorldFolder(folder)) return new TemplateLocation(key.toString(), folder, key);
+            if ("minecraft".equals(key.getNamespace())) {
+                Path oneLevel = dimensionsFolder().resolve(key.getKey()).normalize();
+                if (isValidWorldFolder(oneLevel)) return new TemplateLocation(key.toString(), oneLevel, key);
+            }
+            return null;
+        }
+
+        Path legacy = worldContainer.resolve(templateId).normalize();
+        if (isSafeWorldPath(legacy) && isValidWorldFolder(legacy)) return new TemplateLocation(templateId, legacy, null);
+
+        NamespacedKey key = NamespacedKey.minecraft(templateId);
+        Path modern = dimensionFolder(key);
+        if (isValidWorldFolder(modern)) return new TemplateLocation(key.toString(), modern, key);
+        Path oneLevel = dimensionsFolder().resolve(templateId).normalize();
+        if (isValidWorldFolder(oneLevel)) return new TemplateLocation(key.toString(), oneLevel, key);
+        return null;
+    }
+
+    private Path dimensionsFolder() {
+        World primary = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
+        Path levelFolder = primary == null ? worldContainer.resolve("world") : primary.getWorldFolder().toPath();
+        return levelFolder.toAbsolutePath().normalize().resolve("dimensions").normalize();
+    }
+
+    private Path dimensionFolder(NamespacedKey key) {
+        return dimensionsFolder().resolve(key.getNamespace()).resolve(key.getKey()).normalize();
+    }
+
+    private static NamespacedKey parseDimensionKey(String value) {
+        try {
+            return NamespacedKey.fromString(value.toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    private boolean isSafeWorldPath(Path folder) {
+        Path normalized = folder.toAbsolutePath().normalize();
+        return normalized.startsWith(worldContainer) && !normalized.equals(worldContainer);
+    }
+
+    private boolean isSafeDestination(Path folder) {
+        Path normalized = folder.toAbsolutePath().normalize();
+        return normalized.startsWith(worldContainer) && !normalized.equals(worldContainer)
+                && !normalized.equals(dimensionsFolder());
+    }
+
+    private static boolean isValidWorldFolder(Path folder) {
+        return Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS)
+                && !Files.isSymbolicLink(folder)
+                && Files.isRegularFile(folder.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS);
     }
 
     private LoadedMap requireTracked(MapInstance instance) {
@@ -261,9 +332,9 @@ public final class MapManager {
     }
 
     private static void validateTemplateId(String templateId) {
-        if (templateId == null || !TEMPLATE_ID.matcher(templateId).matches()
-                || templateId.equals(".") || templateId.equals("..")) {
-            throw new IllegalArgumentException("Invalid map template id");
+        if (templateId == null || !(LEGACY_ID.matcher(templateId).matches()
+                || templateId.matches("[a-z0-9_.-]{1,48}:[a-z0-9/._-]{1,48}"))) {
+            throw new IllegalArgumentException("Invalid map template id; use a world name or namespace:key");
         }
     }
 
@@ -271,23 +342,18 @@ public final class MapManager {
         Files.walkFileTree(source, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) throws IOException {
-                if (Files.isSymbolicLink(directory)) {
-                    throw new IOException("Symbolic links are not allowed in map templates: " + directory);
-                }
-                Path target = destination.resolve(source.relativize(directory));
-                Files.createDirectories(target);
+                if (Files.isSymbolicLink(directory)) throw new IOException("Symbolic links are not allowed in map templates: " + directory);
+                Files.createDirectories(destination.resolve(source.relativize(directory)));
                 return FileVisitResult.CONTINUE;
             }
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                if (Files.isSymbolicLink(file)) {
-                    throw new IOException("Symbolic links are not allowed in map templates: " + file);
-                }
+                if (Files.isSymbolicLink(file)) throw new IOException("Symbolic links are not allowed in map templates: " + file);
+                String relative = source.relativize(file).toString().replace('\\\\', '/');
                 String name = file.getFileName().toString();
-                // These files identify/lock the original world folder and must
-                // not be reused by its disposable copy.
-                if (!name.equals("session.lock") && !name.equals("uid.dat")) {
+                if (!name.equals("session.lock") && !name.equals("uid.dat")
+                        && !relative.equals("data/paper/metadata.dat")) {
                     Files.copy(file, destination.resolve(source.relativize(file)));
                 }
                 return FileVisitResult.CONTINUE;
@@ -303,7 +369,6 @@ public final class MapManager {
                 Files.delete(file);
                 return FileVisitResult.CONTINUE;
             }
-
             @Override
             public FileVisitResult postVisitDirectory(Path directory, IOException exception) throws IOException {
                 if (exception != null) throw exception;
@@ -314,10 +379,9 @@ public final class MapManager {
     }
 
     private static void requireServerThread() {
-        if (!Bukkit.isPrimaryThread()) {
-            throw new IllegalStateException("MapManager must be called from the Paper server thread");
-        }
+        if (!Bukkit.isPrimaryThread()) throw new IllegalStateException("MapManager must be called from the Paper server thread");
     }
 
+    private record TemplateLocation(String id, Path folder, NamespacedKey dimensionKey) { }
     private record LoadedMap(MapInstance instance, Path folder, UUID worldUid) { }
 }
