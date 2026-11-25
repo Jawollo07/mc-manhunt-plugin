@@ -47,7 +47,8 @@ public final class MapManager {
         validateTemplateId(templateId);
         TemplateLocation template = resolveTemplate(templateId);
         if (template != null) template = canonicalizeDimensionFolder(template);
-        if (template == null || !isValidWorldFolder(template.folder())) {
+        if (template == null || !(template.dimensionKey() == null
+                ? isValidWorldFolder(template.folder()) : isValidDimensionFolder(template.folder()))) {
             throw new IllegalArgumentException("Map template does not exist or is invalid: " + templateId);
         }
         if (getLoadedTemplateWorld(templateId) != null) {
@@ -158,7 +159,7 @@ public final class MapManager {
                     String firstName = first.getFileName().toString();
 
                     // Also recognize a one-level dimensions/<world> folder used by some migrated setups.
-                    if (isValidWorldFolder(first) && KEY.matcher(firstName).matches()) {
+                    if (isValidDimensionFolder(first) && KEY.matcher(firstName).matches()) {
                         NamespacedKey key = NamespacedKey.minecraft(firstName);
                         found.put(key.toString(), new TemplateLocation(key.toString(), first, key));
                         continue;
@@ -169,7 +170,7 @@ public final class MapManager {
                         for (Path folder : secondLevel
                                 .filter(path -> Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
                                 .filter(path -> !Files.isSymbolicLink(path))
-                                .filter(MapManager::isValidWorldFolder).toList()) {
+                                .filter(MapManager::isValidDimensionFolder).toList()) {
                             String keyName = folder.getFileName().toString();
                             if (!KEY.matcher(keyName).matches()) continue;
                             NamespacedKey key = new NamespacedKey(firstName, keyName);
@@ -199,7 +200,8 @@ public final class MapManager {
     }
 
     private MapTemplate inspectTemplate(TemplateLocation location) {
-        boolean valid = isValidWorldFolder(location.folder());
+        boolean valid = location.dimensionKey() == null
+                ? isValidWorldFolder(location.folder()) : isValidDimensionFolder(location.folder());
         boolean loaded = getLoadedTemplateWorld(location.id()) != null;
         String modified = "Unbekannt";
         try {
@@ -289,10 +291,10 @@ public final class MapManager {
             NamespacedKey key = parseDimensionKey(templateId);
             if (key == null) return null;
             Path folder = dimensionFolder(key);
-            if (isValidWorldFolder(folder)) return new TemplateLocation(key.toString(), folder, key);
+            if (isValidDimensionFolder(folder)) return new TemplateLocation(key.toString(), folder, key);
             if ("minecraft".equals(key.getNamespace())) {
                 Path oneLevel = dimensionsFolder().resolve(key.getKey()).normalize();
-                if (isValidWorldFolder(oneLevel)) return new TemplateLocation(key.toString(), oneLevel, key);
+                if (isValidDimensionFolder(oneLevel)) return new TemplateLocation(key.toString(), oneLevel, key);
             }
             return null;
         }
@@ -364,6 +366,23 @@ public final class MapManager {
         return Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS)
                 && !Files.isSymbolicLink(folder)
                 && Files.isRegularFile(folder.resolve("level.dat"), LinkOption.NOFOLLOW_LINKS);
+    }
+
+    /**
+     * Paper 26.1+ stores custom dimensions below the primary world's
+     * dimensions/<namespace>/<key> directory. These dimension folders do not
+     * have their own level.dat; world metadata is inherited from the root
+     * world. Require actual dimension data so arbitrary directories are not
+     * mistaken for templates.
+     */
+    private static boolean isValidDimensionFolder(Path folder) {
+        if (!Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(folder)) {
+            return false;
+        }
+        return Files.isDirectory(folder.resolve("region"), LinkOption.NOFOLLOW_LINKS)
+                || Files.isDirectory(folder.resolve("entities"), LinkOption.NOFOLLOW_LINKS)
+                || Files.isRegularFile(folder.resolve("paper-world.yml"), LinkOption.NOFOLLOW_LINKS)
+                || Files.isDirectory(folder.resolve("data"), LinkOption.NOFOLLOW_LINKS);
     }
 
     private LoadedMap requireTracked(MapInstance instance) {
