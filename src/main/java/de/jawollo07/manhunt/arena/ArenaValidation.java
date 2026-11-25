@@ -43,6 +43,8 @@ public record ArenaValidation(List<String> errors, List<String> warnings) {
         }
 
         for (String recommended : recommendedFor(mode.getId())) {
+            if (recommended.equals("extraction")
+                    && !arena.modeBooleanSetting(mode.getId(), "extraction_enabled", true)) continue;
             if (!hasSpawnPoint(arena, recommended)) {
                 warnings.add("Optionaler Spawnpunkt fehlt: " + recommended);
             }
