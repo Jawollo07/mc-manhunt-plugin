@@ -304,9 +304,9 @@ public final class MapManager {
 
         NamespacedKey key = NamespacedKey.minecraft(templateId);
         Path modern = dimensionFolder(key);
-        if (isValidWorldFolder(modern)) return new TemplateLocation(key.toString(), modern, key);
+        if (isValidDimensionFolder(modern)) return new TemplateLocation(key.toString(), modern, key);
         Path oneLevel = dimensionsFolder().resolve(templateId).normalize();
-        if (isValidWorldFolder(oneLevel)) return new TemplateLocation(key.toString(), oneLevel, key);
+        if (isValidDimensionFolder(oneLevel)) return new TemplateLocation(key.toString(), oneLevel, key);
         return null;
     }
 
