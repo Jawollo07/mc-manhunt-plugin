@@ -560,13 +560,28 @@ public final class ArenaManagementMenu implements Listener {
                 if (event.getClick().isRightClick()) {
                     try {
                         Arena arena = plugin.getArenaService().find(holder.arenaId).orElseThrow();
+                        ArenaSpawnPoint point = arena.spawnPoint(spawnName).orElseThrow(
+                                () -> new IllegalArgumentException("Dieser Spawnpunkt existiert nicht mehr."));
                         if (!plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName())) {
-                            player.sendMessage("§cZum Testen musst du dich in der Vorlagenwelt befinden.");
+                            enterTemplateForEditing(player, arena.worldName());
+                        }
+                        World templateWorld = plugin.getMapManager().getLoadedTemplateWorld(arena.worldName());
+                        if (templateWorld == null) {
+                            player.sendMessage("§cDie Vorlagenwelt konnte nicht zum Testen geladen werden.");
                             return;
                         }
-                        arena.spawnPoint(spawnName).ifPresent(point -> player.teleport(point.toLocation(player.getWorld())));
-                    } catch (SQLException exception) {
-                        player.sendMessage("§cSpawnpunkt konnte nicht geladen werden.");
+                        if (!player.getWorld().equals(templateWorld) && !player.teleport(templateWorld.getSpawnLocation())) {
+                            player.sendMessage("§cTeleport in die Vorlagenwelt fehlgeschlagen.");
+                            return;
+                        }
+                        if (!player.teleport(point.toLocation(templateWorld))) {
+                            player.sendMessage("§cTeleport zum Spawnpunkt fehlgeschlagen.");
+                            return;
+                        }
+                        player.sendMessage("§aDu testest jetzt Spawnpunkt §e" + spawnName
+                                + " §7in Vorlage §f" + arena.worldName() + "§a.");
+                    } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+                        player.sendMessage("§cSpawnpunkt konnte nicht getestet werden: " + exception.getMessage());
                     }
                 } else openConfirm(player, holder.arenaId, spawnName);
             }
