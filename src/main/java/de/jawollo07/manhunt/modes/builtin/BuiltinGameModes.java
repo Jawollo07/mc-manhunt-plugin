@@ -122,7 +122,8 @@ public final class BuiltinGameModes {
         }
 
         protected boolean timedOut(Game game, long elapsedSeconds) {
-            int limit = game.getSettings().timeLimitSeconds();
+            int configured = game.getArena().modeIntSetting(getId(), "time_limit_seconds", 0);
+            int limit = configured > 0 ? configured : game.getSettings().timeLimitSeconds();
             return limit > 0 && elapsedSeconds >= limit;
         }
 
@@ -321,7 +322,9 @@ public final class BuiltinGameModes {
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 3) throw new IllegalStateException("Hitman benötigt mindestens drei Spieler.");
-            int hitmanCount = players.size() >= 7 ? 2 : 1;
+            int configuredHitmen = game.getArena().modeIntSetting(getId(), "hitman_count", 0);
+            int hitmanCount = configuredHitmen <= 0 ? (players.size() >= 7 ? 2 : 1)
+                    : Math.min(players.size() - 1, Math.max(1, configuredHitmen));
             players = orderedForTeams(game, players, "hitmen", "survivors", hitmanCount);
             hitmen = team(game, "Hitmen", "DARK_RED");
             survivors = team(game, "Survivors", "GREEN");
@@ -372,7 +375,8 @@ public final class BuiltinGameModes {
         }
 
         @Override public void onTick(Game game, long elapsedSeconds) {
-            if (game.getArena().spawnPoint("extraction").isPresent() && game.getMapInstance().isPresent()) {
+            if (game.getArena().modeBooleanSetting(getId(), "extraction_enabled", true)
+                    && game.getArena().spawnPoint("extraction").isPresent() && game.getMapInstance().isPresent()) {
                 org.bukkit.World world = plugin.getMapManager().getWorld(game.getMapInstance().orElseThrow());
                 org.bukkit.Location extraction = game.getArena().spawnPoint("extraction").orElseThrow().toLocation(world);
                 List<UUID> escaped = survivors.getMembers().stream()
@@ -485,7 +489,9 @@ public final class BuiltinGameModes {
         @Override public void onPrepare(Game game) {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 2) throw new IllegalStateException("Infection benötigt mindestens zwei Spieler.");
-            int initial = players.size() >= 7 ? 2 : 1;
+            int configuredInitial = game.getArena().modeIntSetting(getId(), "initial_infected", 0);
+            int initial = configuredInitial <= 0 ? (players.size() >= 7 ? 2 : 1)
+                    : Math.min(players.size() - 1, Math.max(1, configuredInitial));
             players = orderedForTeams(game, players, "infected", "survivors", initial);
             infected = team(game, "Infected", "DARK_GREEN");
             survivors = team(game, "Survivors", "AQUA");
