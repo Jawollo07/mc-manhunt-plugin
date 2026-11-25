@@ -151,8 +151,14 @@ public final class GameLifecycleService {
         Team team = game.getTeamManager().getTeamOf(participant.getUniqueId()).orElse(null);
         if (team != null) {
             String teamKey = "team:" + slug(team.getName());
-            ArenaSpawnPoint teamSpawn = arena.spawnPoint(teamKey).orElse(null);
-            if (teamSpawn != null) return teamSpawn.toLocation(world);
+            java.util.List<ArenaSpawnPoint> teamSpawns = arena.spawnPoints().values().stream()
+                    .filter(point -> point.name().equalsIgnoreCase(teamKey)
+                            || point.name().toLowerCase(java.util.Locale.ROOT).startsWith(teamKey + ":"))
+                    .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+            if (!teamSpawns.isEmpty()) {
+                java.util.Collections.shuffle(teamSpawns);
+                return teamSpawns.get(0).toLocation(world);
+            }
         }
         return arena.spawnPoint("default")
                 .map(point -> point.toLocation(world))
