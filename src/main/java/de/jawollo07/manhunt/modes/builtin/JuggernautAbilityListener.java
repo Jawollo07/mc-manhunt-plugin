@@ -45,6 +45,7 @@ public final class JuggernautAbilityListener implements Listener {
         Material held = boss.getInventory().getItemInMainHand().getType();
         switch (held) {
             case BLAZE_ROD -> {
+                if (!game.getArena().modeBooleanSetting("juggernaut", "ability_slam", true)) return;
                 event.setCancelled(true);
                 if (!ready(boss, "slam", 15)) return;
                 for (Player target : boss.getWorld().getPlayers()) {
@@ -55,6 +56,7 @@ public final class JuggernautAbilityListener implements Listener {
                 boss.sendMessage("§cGround Slam ausgelöst!");
             }
             case IRON_INGOT -> {
+                if (!game.getArena().modeBooleanSetting("juggernaut", "ability_charge", true)) return;
                 event.setCancelled(true);
                 if (!ready(boss, "charge", 12)) return;
                 Vector direction = boss.getLocation().getDirection().normalize().multiply(2.1);
@@ -63,6 +65,7 @@ public final class JuggernautAbilityListener implements Listener {
                 boss.sendMessage("§cCharge!");
             }
             case GOAT_HORN -> {
+                if (!game.getArena().modeBooleanSetting("juggernaut", "ability_roar", true)) return;
                 event.setCancelled(true);
                 if (!ready(boss, "roar", 20)) return;
                 for (Player target : boss.getWorld().getPlayers()) {
@@ -73,6 +76,7 @@ public final class JuggernautAbilityListener implements Listener {
                 boss.sendMessage("§cRoar! Jäger in deiner Nähe wurden geschwächt.");
             }
             case GOLDEN_APPLE -> {
+                if (!game.getArena().modeBooleanSetting("juggernaut", "ability_regeneration", true)) return;
                 event.setCancelled(true);
                 if (!ready(boss, "regeneration", 30)) return;
                 boss.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 160, 2, true, true, true));
