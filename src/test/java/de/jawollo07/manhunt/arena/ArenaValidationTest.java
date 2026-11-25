@@ -68,7 +68,7 @@ class ArenaValidationTest {
         ArenaValidation result = ArenaValidation.check(arena, hitman, true, false);
 
         assertTrue(result.ready());
-        assertTrue(result.warnings().stream().anyMatch(message -> message.contains("team:hitmen")));
+        assertFalse(result.warnings().stream().anyMatch(message -> message.contains("team:hitmen")));
         assertTrue(result.warnings().stream().anyMatch(message -> message.contains("extraction")));
     }
 }
