@@ -129,6 +129,20 @@ public final class StorageManager implements AutoCloseable {
                     INSERT OR IGNORE INTO schema_migrations (version, applied_at)
                     VALUES (3, strftime('%s', 'now') * 1000)
                     """);
+
+            // Migration 4: optional mode allow-list per arena. No rows means all registered modes.
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS arena_enabled_modes (
+                        arena_id TEXT NOT NULL,
+                        mode_id TEXT NOT NULL,
+                        PRIMARY KEY (arena_id, mode_id),
+                        FOREIGN KEY (arena_id) REFERENCES arenas(id) ON DELETE CASCADE
+                    )
+                    """);
+            statement.execute("""
+                    INSERT OR IGNORE INTO schema_migrations (version, applied_at)
+                    VALUES (4, strftime('%s', 'now') * 1000)
+                    """);
         }
     }
 
