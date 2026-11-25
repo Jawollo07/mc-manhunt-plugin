@@ -333,6 +333,11 @@ public final class MapManager {
         }
     }
 
+    private String normalizeEditorKey(String templateId) {
+        TemplateLocation location = resolveTemplate(templateId);
+        return (location == null ? templateId : location.id()).toLowerCase(Locale.ROOT);
+    }
+
     private boolean isSafeWorldPath(Path folder) {
         Path normalized = folder.toAbsolutePath().normalize();
         return normalized.startsWith(worldContainer) && !normalized.equals(worldContainer);
