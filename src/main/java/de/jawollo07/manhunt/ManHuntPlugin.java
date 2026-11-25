@@ -6,6 +6,7 @@ import de.jawollo07.manhunt.arena.ArenaService;
 import de.jawollo07.manhunt.game.AdminMenu;
 import de.jawollo07.manhunt.game.GameLifecycleService;
 import de.jawollo07.manhunt.game.GameManager;
+import de.jawollo07.manhunt.game.GameHudService;
 import de.jawollo07.manhunt.game.LobbyMenu;
 import de.jawollo07.manhunt.map.MapManager;
 import de.jawollo07.manhunt.modes.GameModeFactory;
@@ -24,6 +25,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class ManHuntPlugin extends JavaPlugin {
     private ConfigManager configManager;
     private GameManager gameManager;
+    private GameHudService gameHudService;
     private GameLifecycleService gameLifecycleService;
     private GameModeRegistry gameModeRegistry;
     private MapManager mapManager;
@@ -69,6 +71,8 @@ public final class ManHuntPlugin extends JavaPlugin {
         gameLifecycleService = new GameLifecycleService(
                 gameManager, playerSnapshotService, playerManager, mapManager, statisticsRepository
         );
+        gameHudService = new GameHudService(this, gameManager);
+        gameHudService.start();
         getServer().getPluginManager().registerEvents(
                 new PlayerSessionListener(gameManager, gameLifecycleService, playerSnapshotService),
                 this
@@ -121,6 +125,7 @@ public final class ManHuntPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (commandHandler != null) commandHandler.shutdown();
+        if (gameHudService != null) gameHudService.shutdown();
         if (playerSnapshotService != null) {
             for (Player player : getServer().getOnlinePlayers()) {
                 try {
@@ -144,6 +149,7 @@ public final class ManHuntPlugin extends JavaPlugin {
 
     public ConfigManager getConfigManager() { return configManager; }
     public GameManager getGameManager() { return gameManager; }
+    public GameHudService getGameHudService() { return gameHudService; }
     public GameLifecycleService getGameLifecycleService() { return gameLifecycleService; }
     public GameModeRegistry getGameModeRegistry() { return gameModeRegistry; }
     public MapManager getMapManager() { return mapManager; }
