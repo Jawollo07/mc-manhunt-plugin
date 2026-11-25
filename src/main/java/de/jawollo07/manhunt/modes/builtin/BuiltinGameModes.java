@@ -214,10 +214,16 @@ public final class BuiltinGameModes {
             List<GamePlayer> players = new ArrayList<>(game.getPlayers());
             if (players.size() < 2) throw new IllegalStateException("Assassin benötigt mindestens zwei Spieler.");
             Collections.shuffle(players);
+            boolean randomTargets = "random".equalsIgnoreCase(
+                    game.getArena().modeSetting(getId(), "target_distribution", "cycle"));
             assassins = team(game, "Assassins", "DARK_RED");
             for (int i = 0; i < players.size(); i++) {
                 GamePlayer current = players.get(i);
-                UUID target = players.get((i + 1) % players.size()).getUniqueId();
+                List<GamePlayer> candidates = players.stream()
+                        .filter(candidate -> !candidate.getUniqueId().equals(current.getUniqueId())).toList();
+                UUID target = randomTargets
+                        ? candidates.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(candidates.size())).getUniqueId()
+                        : players.get((i + 1) % players.size()).getUniqueId();
                 targets.put(current.getUniqueId(), target);
                 assign(game, current, assassins, "assassin");
                 Player owner = Bukkit.getPlayer(current.getUniqueId());
@@ -430,17 +436,23 @@ public final class BuiltinGameModes {
             super.onStart(game);
             Player boss = Bukkit.getPlayer(bossId);
             if (boss != null) {
-                boss.setMaxHealth(40.0);
-                boss.setHealth(40.0);
+                double health = Math.max(20, Math.min(60,
+                        game.getArena().modeIntSetting(getId(), "boss_health", 40)));
+                boss.setMaxHealth(health);
+                boss.setHealth(health);
                 apply(boss, PotionEffectType.RESISTANCE, Integer.MAX_VALUE, 1);
                 apply(boss, PotionEffectType.STRENGTH, Integer.MAX_VALUE, 1);
-                boss.getInventory().addItem(
-                        JuggernautAbilityListener.abilityItem(org.bukkit.Material.BLAZE_ROD, "Ground Slam"),
-                        JuggernautAbilityListener.abilityItem(org.bukkit.Material.IRON_INGOT, "Charge"),
-                        JuggernautAbilityListener.abilityItem(org.bukkit.Material.GOAT_HORN, "Roar"),
-                        JuggernautAbilityListener.abilityItem(org.bukkit.Material.GOLDEN_APPLE, "Regeneration")
-                );
-                boss.sendMessage("§eFähigkeiten: §cBlaze Rod §7= Slam, §cIron Ingot §7= Charge, §cGoat Horn §7= Roar, §cGolden Apple §7= Regeneration");
+                List<org.bukkit.inventory.ItemStack> abilities = new ArrayList<>();
+                if (game.getArena().modeBooleanSetting(getId(), "ability_slam", true))
+                    abilities.add(JuggernautAbilityListener.abilityItem(org.bukkit.Material.BLAZE_ROD, "Ground Slam"));
+                if (game.getArena().modeBooleanSetting(getId(), "ability_charge", true))
+                    abilities.add(JuggernautAbilityListener.abilityItem(org.bukkit.Material.IRON_INGOT, "Charge"));
+                if (game.getArena().modeBooleanSetting(getId(), "ability_roar", true))
+                    abilities.add(JuggernautAbilityListener.abilityItem(org.bukkit.Material.GOAT_HORN, "Roar"));
+                if (game.getArena().modeBooleanSetting(getId(), "ability_regeneration", true))
+                    abilities.add(JuggernautAbilityListener.abilityItem(org.bukkit.Material.GOLDEN_APPLE, "Regeneration"));
+                if (!abilities.isEmpty()) boss.getInventory().addItem(abilities.toArray(org.bukkit.inventory.ItemStack[]::new));
+                boss.sendMessage("§eLeben: §c" + (int) health + " HP §7| §eAktive Fähigkeiten: §f" + abilities.size());
             }
         }
 
