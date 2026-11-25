@@ -107,7 +107,7 @@ public record Arena(String id, String displayName, String worldName, Map<String,
     public Arena withoutSpawnPoint(String name) {
         Map<String, ArenaSpawnPoint> updated = new LinkedHashMap<>(spawnPoints);
         updated.remove(normalizeSpawnKey(name));
-        return new Arena(id, displayName, worldName, updated);
+        return new Arena(id, displayName, worldName, updated, enabledModeIds, modeSettings);
     }
 
     /** Creates an independent arena entry using the same template and spawn layout. */
