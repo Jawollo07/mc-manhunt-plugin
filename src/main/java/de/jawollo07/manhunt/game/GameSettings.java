@@ -6,8 +6,15 @@ public record GameSettings(
         int countdownSeconds,
         int timeLimitSeconds,
         boolean allowLateJoin,
-        boolean allowSpectators
+        boolean allowSpectators,
+        boolean randomTeamDistribution
 ) {
+    /** Backwards-compatible constructor; random team distribution stays enabled by default. */
+    public GameSettings(int minPlayers, int maxPlayers, int countdownSeconds, int timeLimitSeconds,
+                        boolean allowLateJoin, boolean allowSpectators) {
+        this(minPlayers, maxPlayers, countdownSeconds, timeLimitSeconds, allowLateJoin, allowSpectators, true);
+    }
+
     public GameSettings {
         if (minPlayers < 1) {
             throw new IllegalArgumentException("minPlayers must be positive");
