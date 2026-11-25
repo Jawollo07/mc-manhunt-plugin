@@ -421,8 +421,10 @@ public final class ArenaManagementMenu implements Listener {
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
                     () -> new IllegalStateException("Arena nicht gefunden."));
             if (!plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName())) {
-                player.sendMessage("§cGehe zuerst in die Vorlagenwelt §e" + arena.worldName()
-                        + " §cund öffne dort erneut die Arenaverwaltung.");
+                player.sendMessage("§eDie passende Vorlagenwelt wird zum Setzen des Spawnpunkts geöffnet.");
+                enterTemplateForEditing(player, arena.worldName());
+                player.sendMessage("§7Gehe an die gewünschte Position und öffne anschließend §e/manhunt arenas"
+                        + " §7erneut. Wähle dieselbe Arena und klicke den Spawnpunkt nochmals an.");
                 return;
             }
             var location = player.getLocation();
