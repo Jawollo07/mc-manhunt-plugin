@@ -180,7 +180,8 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Arena-ID: §f" + arena.id(),
                     "§7Vorlage: §f" + arena.worldName(),
                     "§7Status: " + statusColor(template) + template.status(),
-                    "§7Spawnpunkte: §f" + arena.spawnPoints().size()));
+                    "§7Spawnpunkte: §f" + arena.spawnPoints().size(),
+                    "§7Freigegebene Modi: §f" + (arena.enabledModeIds().isEmpty() ? "Alle" : String.join(", ", arena.enabledModeIds()))));
             String[] spawnNames = {
                     "default", "team:hitmen", "team:survivors", "team:juggernaut",
                     "team:hunters", "team:assassins", "team:infected", "extraction"
