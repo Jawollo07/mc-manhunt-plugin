@@ -161,6 +161,10 @@ public final class ArenaManagementMenu implements Listener {
                         "§eRechtsklick: Position in Vorlagenwelt testen"));
             }
             inventory.setItem(45, item(Material.ARROW, "§eZurück"));
+            inventory.setItem(46, item(Material.COPY, "§aArena duplizieren",
+                    "§7Kopiert diese Arena inklusive",
+                    "§7Kartenvorlage und aller Spawnpunkte.",
+                    "§7Die Kopie erhält eine eigene Arena-ID."));
             inventory.setItem(47, item(Material.NAME_TAG, "§eAnzeigename ändern",
                     "§7Neuen Namen im Chat eingeben."));
             inventory.setItem(48, item(Material.FILLED_MAP, "§eKartenvorlage wechseln",
@@ -432,6 +436,12 @@ public final class ArenaManagementMenu implements Listener {
             }
         } else if (holder.screen == Screen.DETAILS) {
             if (slot == 45) { openArenaList(player); return; }
+            if (slot == 46) {
+                pendingInputs.put(player.getUniqueId(), new PendingInput(holder.arenaId, InputAction.DUPLICATE));
+                player.closeInventory();
+                player.sendMessage("§eGib eine neue Arena-ID für die Kopie ein. Mit '-' abbrechen.");
+                return;
+            }
             if (slot == 47 || slot == 48) {
                 pendingInputs.put(player.getUniqueId(), new PendingInput(holder.arenaId,
                         slot == 47 ? InputAction.RENAME : InputAction.CHANGE_TEMPLATE));
@@ -484,8 +494,8 @@ public final class ArenaManagementMenu implements Listener {
             openDetails(player, pending.arenaId());
             return;
         }
-        if (value.isBlank() || value.length() > 48) {
-            player.sendMessage("§cDer Wert muss zwischen 1 und 48 Zeichen lang sein.");
+        if (value.isBlank() || value.length() > 64) {
+            player.sendMessage("§cDer Wert muss zwischen 1 und 64 Zeichen lang sein.");
             openDetails(player, pending.arenaId());
             return;
         }
@@ -562,7 +572,7 @@ public final class ArenaManagementMenu implements Listener {
     }
 
     private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, DETAILS, CONFIRM }
-    private enum InputAction { RENAME, CHANGE_TEMPLATE }
+    private enum InputAction { RENAME, CHANGE_TEMPLATE, DUPLICATE }
     private record PendingInput(String arenaId, InputAction action) { }
 
     private static final class MenuHolder implements InventoryHolder {
