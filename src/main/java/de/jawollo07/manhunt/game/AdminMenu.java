@@ -2,6 +2,7 @@ package de.jawollo07.manhunt.game;
 
 import de.jawollo07.manhunt.ManHuntPlugin;
 import de.jawollo07.manhunt.arena.Arena;
+import de.jawollo07.manhunt.arena.ArenaValidation;
 import de.jawollo07.manhunt.modes.GameModeFactory;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -106,19 +107,28 @@ public final class AdminMenu implements Listener {
         holder.inventory = inventory;
         try {
             List<Arena> arenas = plugin.getArenaService().findAll();
+            var mode = plugin.getGameModeRegistry().get(modeId)
+                    .orElseThrow(() -> new IllegalStateException("Spielmodus ist nicht mehr verfügbar."))
+                    .createSession();
             int slot = FIRST_SLOT;
             for (Arena arena : arenas) {
                 if (slot > LAST_SLOT) break;
                 holder.entries.put(slot, arena.id());
                 var template = plugin.getMapManager().inspectTemplate(arena.worldName());
-                Material icon = !template.valid() ? Material.BARRIER
-                        : template.loaded() ? Material.YELLOW_CONCRETE : Material.MAP;
-                inventory.setItem(slot++, item(icon, "§a" + arena.displayName(),
+                ArenaValidation validation = ArenaValidation.check(arena, mode, template.valid(), template.loaded());
+                Material icon = !validation.ready() ? Material.BARRIER
+                        : validation.warnings().isEmpty() ? Material.MAP : Material.YELLOW_CONCRETE;
+                String checkLine = !validation.errors().isEmpty()
+                        ? "§cNicht startbereit: " + validation.errors().get(0)
+                        : validation.warnings().isEmpty() ? "§aPrüfung: bereit"
+                        : "§eHinweis: " + validation.warnings().get(0);
+                inventory.setItem(slot++, item(icon, (validation.ready() ? "§a" : "§c") + arena.displayName(),
                         "§7Arena-ID: §f" + arena.id(),
                         "§7Vorlage: §f" + arena.worldName(),
-                        "§7Status: " + (template.valid() ? (template.loaded() ? "§e" : "§a") : "§c") + template.status(),
+                        "§7Vorlagenstatus: " + template.status(),
                         "§7Spawnpunkte: §f" + arena.spawnPoints().size(),
-                        "§aKlicken, um die Runde zu erstellen"));
+                        checkLine,
+                        validation.ready() ? "§aKlicken für Einstellungen" : "§cVor Start erst Fehler beheben"));
             }
             if (arenas.isEmpty()) inventory.setItem(22, item(Material.BARRIER, "§cKeine Arenen vorhanden",
                     "§7Lege zuerst eine Arena mit /manhunt arena create an."));
@@ -163,9 +173,14 @@ public final class AdminMenu implements Listener {
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
                     () -> new IllegalStateException("Die Arena ist nicht mehr verfügbar."));
             var template = plugin.getMapManager().inspectTemplate(arena.worldName());
-            if (!template.valid()) throw new IllegalStateException("Kartenvorlage ist ungültig: " + template.status());
-            if (template.loaded()) throw new IllegalStateException("Kartenvorlage ist noch geladen. Entlade die Welt zuerst.");
             var mode = factory.createSession();
+            ArenaValidation validation = ArenaValidation.check(arena, mode, template.valid(), template.loaded());
+            if (!validation.ready()) {
+                throw new IllegalStateException(String.join(" ", validation.errors()));
+            }
+            for (String warning : validation.warnings()) {
+                player.sendMessage("§e[ManHunt] Hinweis: " + warning);
+            }
             int minimum = Math.max(plugin.getConfigManager().getInt("game.min-players", 2), mode.getMinimumPlayers());
             GameSettings settings = new GameSettings(
                     minimum,
