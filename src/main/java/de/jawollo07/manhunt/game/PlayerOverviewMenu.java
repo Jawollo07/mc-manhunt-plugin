@@ -88,11 +88,7 @@ public final class PlayerOverviewMenu implements Listener {
                 "§8Aktualisiert sich automatisch"
         )));
 
-        List<GamePlayer> participants = new ArrayList<>(game.getPlayers());
-        participants.sort(Comparator
-                .comparing((GamePlayer p) -> game.getTeamManager().getTeamOf(p.getUniqueId())
-                        .map(Team::getName).orElse("~"))
-                .thenComparing(p -> playerName(p.getUniqueId()), String.CASE_INSENSITIVE_ORDER));
+        List<GamePlayer> participants = sortedParticipants(game);
 
         int slot = 9;
         for (GamePlayer participant : participants) {
@@ -126,6 +122,15 @@ public final class PlayerOverviewMenu implements Listener {
         }
         inventory.setItem(49, item(Material.CLOCK, "§eAktualisieren", List.of("§7Die Übersicht wird automatisch aktualisiert.")));
         inventory.setItem(53, item(Material.BARRIER, "§cSchließen", List.of("§7Menü schließen")));
+    }
+
+    private List<GamePlayer> sortedParticipants(Game game) {
+        List<GamePlayer> participants = new ArrayList<>(game.getPlayers());
+        participants.sort(Comparator
+                .comparing((GamePlayer p) -> game.getTeamManager().getTeamOf(p.getUniqueId())
+                        .map(Team::getName).orElse("~"))
+                .thenComparing(p -> playerName(p.getUniqueId()), String.CASE_INSENSITIVE_ORDER));
+        return participants;
     }
 
     private String disconnectLabel(Game game, GamePlayer participant) {
@@ -226,7 +231,30 @@ public final class PlayerOverviewMenu implements Listener {
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (event.getClickedInventory() != event.getView().getTopInventory()) return;
-        if (event.getRawSlot() == 49) {
+        if (event.getRawSlot() >= 9 && event.getRawSlot() <= 44) {
+            Game game = plugin.getGameManager().getActiveGame().orElse(null);
+            if (game == null || game.getState() != GameState.RUNNING || !game.getSettings().allowSpectators()) return;
+            GamePlayer viewer = game.getPlayer(player.getUniqueId()).orElse(null);
+            if (viewer == null || (!viewer.isEliminated()
+                    && viewer.getStatus() != de.jawollo07.manhunt.player.PlayerStatus.SPECTATING)) {
+                player.sendMessage("§cNur Zuschauer können Spieler verfolgen.");
+                return;
+            }
+            List<GamePlayer> participants = sortedParticipants(game);
+            int index = event.getRawSlot() - 9;
+            if (index < 0 || index >= participants.size()) return;
+            GamePlayer target = participants.get(index);
+            if (target.getUniqueId().equals(player.getUniqueId()) || !target.isActiveForRound()) return;
+            Player onlineTarget = Bukkit.getPlayer(target.getUniqueId());
+            if (onlineTarget == null || !onlineTarget.isOnline()) {
+                player.sendMessage("§cDieser Spieler ist nicht online.");
+                return;
+            }
+            if (player.teleport(onlineTarget.getLocation())) {
+                player.setGameMode(org.bukkit.GameMode.SPECTATOR);
+                player.sendMessage("§aDu beobachtest jetzt §e" + onlineTarget.getName() + "§a.");
+            }
+        } else if (event.getRawSlot() == 49) {
             Game game = plugin.getGameManager().getActiveGame().orElse(null);
             if (game != null) render(game, event.getView().getTopInventory());
         } else if (event.getRawSlot() == 53) {
