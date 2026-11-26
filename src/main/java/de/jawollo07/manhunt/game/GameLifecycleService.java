@@ -221,11 +221,27 @@ public final class GameLifecycleService {
 
     public void playerJoined(UUID playerId) {
         Game game = requireGame();
-        GamePlayer player = game.getPlayer(playerId).orElseThrow(
+        GamePlayer participant = game.getPlayer(playerId).orElseThrow(
                 () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
         );
-        player.reconnect();
-        game.getMode().onPlayerJoin(game, player);
+        if (participant.isConnected()) return;
+        participant.reconnect();
+
+        // Re-enter the disposable arena instead of restoring the pre-game
+        // snapshot. Eliminated players return as spectators at the neutral spawn.
+        if (game.getState() == GameState.RUNNING && mapManager != null && playerManager != null) {
+            Player online = playerManager.findOnlinePlayer(playerId).orElse(null);
+            if (online != null) {
+                Location destination = getRespawnLocation(playerId);
+                if (destination != null && !online.teleport(destination)) {
+                    throw new IllegalStateException("Could not return reconnecting player to the arena: " + playerId);
+                }
+                if (participant.isEliminated()) {
+                    online.setGameMode(org.bukkit.GameMode.SPECTATOR);
+                }
+            }
+        }
+        game.getMode().onPlayerJoin(game, participant);
     }
 
     public void playerQuit(UUID playerId) {
