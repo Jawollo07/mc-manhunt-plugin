@@ -131,6 +131,56 @@ public final class MapManager {
         if (failure != null) throw failure;
     }
 
+    /**
+     * Removes temporary map folders left behind by a server crash/restart.
+     * Only folders carrying the plugin's generated instance naming scheme
+     * are considered; ordinary worlds and map templates are never touched.
+     */
+    public void cleanupOrphanedWorkingCopies() throws IOException {
+        requireServerThread();
+        try (var folders = Files.list(worldContainer)) {
+            for (Path folder : folders
+                    .filter(path -> Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
+                    .filter(path -> !Files.isSymbolicLink(path))
+                    .filter(path -> path.getFileName().toString()
+                            .matches("manhunt_[a-z0-9_.-]+_[a-f0-9]{12}"))
+                    .toList()) {
+                cleanupOrphanedFolder(folder, Bukkit.getWorld(folder.getFileName().toString()));
+            }
+        }
+
+        Path dimensionInstances = dimensionsFolder().resolve("manhunt").normalize();
+        if (!dimensionInstances.startsWith(worldContainer)
+                || !Files.isDirectory(dimensionInstances, LinkOption.NOFOLLOW_LINKS)
+                || Files.isSymbolicLink(dimensionInstances)) return;
+        try (var folders = Files.list(dimensionInstances)) {
+            for (Path folder : folders
+                    .filter(path -> Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
+                    .filter(path -> !Files.isSymbolicLink(path))
+                    .filter(path -> path.getFileName().toString().matches("instance_[a-f0-9]{12}"))
+                    .toList()) {
+                NamespacedKey key = NamespacedKey.fromString("manhunt:" + folder.getFileName());
+                World world = key == null ? null : Bukkit.getWorld(key);
+                cleanupOrphanedFolder(folder, world);
+            }
+        }
+    }
+
+    private void cleanupOrphanedFolder(Path folder, World world) throws IOException {
+        if (world != null) {
+            if (!world.getPlayers().isEmpty()) {
+                plugin.getLogger().warning("Keeping orphaned temporary world because players are still inside: "
+                        + world.getName());
+                return;
+            }
+            if (!Bukkit.unloadWorld(world, true)) {
+                throw new IOException("Paper refused to unload orphaned temporary world: " + world.getName());
+            }
+        }
+        deleteRecursively(folder);
+        plugin.getLogger().info("Removed orphaned temporary map folder: " + folder.getFileName());
+    }
+
     /** Finds legacy worlds in the server root and namespaced worlds below the primary world's dimensions folder. */
     public List<MapTemplate> listTemplates() throws IOException {
         requireServerThread();
