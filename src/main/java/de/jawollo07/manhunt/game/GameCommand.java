@@ -49,6 +49,8 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                 case "join" -> join(sender);
                 case "leave" -> leave(sender);
                 case "ready" -> ready(sender);
+                case "invite" -> invite(sender, args);
+                case "accept" -> acceptInvite(sender);
                 case "vote" -> vote(sender, args);
                 case "start" -> start(sender);
                 case "cancel" -> cancelCountdown(sender);
@@ -268,6 +270,33 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
             Player player = Bukkit.getPlayer(p.getUniqueId());
             return player != null && player.isOnline() && game.isReady(p.getUniqueId());
         }).count();
+    }
+
+    private void invite(CommandSender sender, String[] args) {
+        Player inviter = requirePlayer(sender);
+        requireArgs(args, 3, "Verwendung: /manhunt game invite <spieler>");
+        Game game = requireGame();
+        if (!game.hasPlayer(inviter.getUniqueId())) {
+            throw new IllegalStateException("Du musst der Lobby zuerst beitreten.");
+        }
+        Player invited = Bukkit.getPlayerExact(args[2]);
+        if (invited == null || !invited.isOnline()) {
+            throw new IllegalArgumentException("Dieser Spieler ist nicht online.");
+        }
+        game.invitePlayer(inviter.getUniqueId(), invited.getUniqueId());
+        inviter.sendMessage("§aEinladung an §e" + invited.getName() + " §agesendet.");
+        invited.sendMessage("§6[ManHunt] §e" + inviter.getName()
+                + " §7lädt dich in die Lobby für §e" + game.getMode().getDisplayName()
+                + " §7ein. §a/manhunt game accept §7zum Beitreten.");
+    }
+
+    private void acceptInvite(CommandSender sender) {
+        Player player = requirePlayer(sender);
+        Game game = requireGame();
+        if (!game.consumeInvitation(player.getUniqueId())) {
+            throw new IllegalStateException("Du hast keine gültige Einladung für diese Lobby.");
+        }
+        join(player);
     }
 
     private void ready(CommandSender sender) {
@@ -541,6 +570,8 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/" + label + " game join");
         sender.sendMessage("§e/" + label + " game leave");
         sender.sendMessage("§e/" + label + " game ready §7(Bereitschaft umschalten)");
+        sender.sendMessage("§e/" + label + " game invite <spieler> §7(Spieler einladen)");
+        sender.sendMessage("§e/" + label + " game accept §7(Einladung annehmen)");
         sender.sendMessage("§e/" + label + " game vote <arena> §7(Arena-Abstimmung)");
         sender.sendMessage("§e/" + label + " game start §7(Admin)");
         sender.sendMessage("§e/" + label + " game cancel §7(Countdown abbrechen, Admin)");
@@ -625,9 +656,12 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 2 && args[0].equalsIgnoreCase("game")) {
             List<String> actions = sender.hasPermission("manhunt.admin")
-                    ? List.of("create", "join", "leave", "ready", "vote", "start", "cancel", "status", "lobby", "stop", "reset", "rematch")
-                    : List.of("join", "leave", "ready", "vote", "status", "lobby");
+                    ? List.of("create", "join", "leave", "ready", "invite", "accept", "vote", "start", "cancel", "status", "lobby", "stop", "reset", "rematch")
+                    : List.of("join", "leave", "ready", "invite", "accept", "vote", "status", "lobby");
             return filter(actions, args[1]);
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("invite")) {
+            return filter(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList(), args[2]);
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("vote")) {
             try { return filter(plugin.getArenaService().findAll().stream()
