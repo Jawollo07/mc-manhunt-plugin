@@ -7,7 +7,9 @@ Ein modulares Minecraft-Manhunt-Minispiel-Plugin für Paper. Es bietet vier Spie
 ## Funktionen
 
 - Vier eingebaute Spielmodi: **Assassin Manhunt**, **Hitman**, **Juggernaut** und **Infection**.
-- Ingame-Lobby mit Spielerliste, Teamübersicht, Beitreten und Verlassen.
+- Ingame-Lobby mit Spielerliste, Teamübersicht, Bereitschaftssystem, Arena-Abstimmung, Beitreten und Verlassen.
+- Schnelles Rematch mit derselben Arena, demselben Modus und den zuvor teilnehmenden Online-Spielern.
+- Zuschauer können über die Spielerübersicht aktive Spieler verfolgen.
 - Admin-GUI zur Modus- und Arena-Auswahl, Spielerverwaltung und Steuerung der Runde.
 - Geführtes Arena-Setup mit Kartenvorlagen, Spawnpunkten, Modusfreigaben und Abschlussprüfung.
 - Mehrere Spawnpunkte pro Team; die Zuordnung kann zufällig verteilt werden.
@@ -73,6 +75,9 @@ Alle Befehle können auch mit dem Alias `/mh` verwendet werden.
 | `/manhunt game create <modus> <arena>` | Runde erstellen (Admin) |
 | `/manhunt game join` | Lobby beitreten |
 | `/manhunt game leave` | Lobby verlassen |
+| `/manhunt game ready` | Bereitschaft umschalten |
+| `/manhunt game vote <arena>` | Für eine Arena abstimmen |
+| `/manhunt game rematch` | Letzte Runde erneut erstellen (Admin) |
 | `/manhunt game start` | Countdown manuell starten (Admin) |
 | `/manhunt game cancel` | Countdown abbrechen (Admin) |
 | `/manhunt game status` | Rundenstatus anzeigen |
@@ -99,6 +104,8 @@ game:
   allow-late-join: false
   allow-spectators: true
   result-display-seconds: 8
+  require-ready: false
+  arena-voting: true
 
 maps:
   create-working-copy: true
@@ -113,6 +120,8 @@ general:
 - `countdown-seconds`: Lobby-Countdown in Sekunden.
 - `time-limit-seconds`: globales Zeitlimit; ein Arena-Moduswert kann es überschreiben.
 - `result-display-seconds`: Dauer der Ergebnisanzeige vor dem Aufräumen (0 bis 60 Sekunden).
+- `require-ready`: Wenn `true`, müssen alle aktuell online teilnehmenden Spieler vor dem Countdown bereit sein.
+- `arena-voting`: Aktiviert die Arena-Abstimmung in der Lobby.
 - `maps.create-working-copy` und `maps.delete-working-copy-after-game`: steuern das Erstellen und Entfernen temporärer Kartenkopien.
 
 ## Dokumentation
