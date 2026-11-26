@@ -8,6 +8,7 @@ game:
   time-limit-seconds: 2400
   allow-late-join: false
   allow-spectators: true
+  result-display-seconds: 8
 
 maps:
   create-working-copy: true
