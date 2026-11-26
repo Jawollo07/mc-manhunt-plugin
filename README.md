@@ -8,6 +8,7 @@ Ein modulares Minecraft-Manhunt-Minispiel-Plugin für Paper. Es bietet vier Spie
 
 - Vier eingebaute Spielmodi: **Assassin Manhunt**, **Hitman**, **Juggernaut** und **Infection**.
 - Ingame-Lobby mit Spielerliste, Teamübersicht, Bereitschaftssystem, Arena-Abstimmung, Beitreten und Verlassen.
+- Spielereinladungen per Lobby-Befehl.
 - Schnelles Rematch mit derselben Arena, demselben Modus und den zuvor teilnehmenden Online-Spielern.
 - Zuschauer können über die Spielerübersicht aktive Spieler verfolgen.
 - Admin-GUI zur Modus- und Arena-Auswahl, Spielerverwaltung und Steuerung der Runde.
@@ -76,6 +77,8 @@ Alle Befehle können auch mit dem Alias `/mh` verwendet werden.
 | `/manhunt game join` | Lobby beitreten |
 | `/manhunt game leave` | Lobby verlassen |
 | `/manhunt game ready` | Bereitschaft umschalten |
+| `/manhunt game invite <spieler>` | Spieler in die Lobby einladen |
+| `/manhunt game accept` | Lobby-Einladung annehmen |
 | `/manhunt game vote <arena>` | Für eine Arena abstimmen |
 | `/manhunt game rematch` | Letzte Runde erneut erstellen (Admin) |
 | `/manhunt game start` | Countdown manuell starten (Admin) |
