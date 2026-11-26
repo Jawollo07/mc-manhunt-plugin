@@ -181,7 +181,9 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Vorlage: §f" + arena.worldName(),
                     "§7Status: " + statusColor(template) + template.status(),
                     "§7Spawnpunkte: §f" + arena.spawnPoints().size(),
-                    "§7Freigegebene Modi: §f" + (arena.enabledModeIds().isEmpty() ? "Alle" : String.join(", ", arena.enabledModeIds()))));
+                    "§7Freigegebene Modi: §f" + (arena.enabledModeIds().isEmpty() ? "Alle" : String.join(", ", arena.enabledModeIds())),
+                    "§7Disconnect-Kulanz: §f" + settingValueLabel("disconnect_grace_seconds",
+                            arena.modeSetting("general", "disconnect_grace_seconds", "60"))));
             String[] spawnNames = {
                     "default", "team:hitmen", "team:survivors", "team:juggernaut",
                     "team:hunters", "team:assassins", "team:infected", "extraction"
@@ -214,6 +216,12 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Team-Spawns: §f" + spawnPoints.stream().filter(point -> point.name().startsWith("team:")).count(),
                     "§7Standard-Spawn: " + (arena.spawnPoint("default").isPresent() ? "§aGesetzt" : "§eNicht gesetzt"),
                     template.loaded() ? "§eVorlage ist geladen – vor Spielstart entladen." : "§aVorlage ist nicht geladen."));
+            inventory.setItem(26, item(Material.CLOCK, "§eDisconnect-Kulanz ändern",
+                    "§7Aktuell: §f" + settingValueLabel("disconnect_grace_seconds",
+                            arena.modeSetting("general", "disconnect_grace_seconds", "60")),
+                    "§7Nach Ablauf werden getrennte Spieler",
+                    "§7automatisch als ausgeschieden gewertet.",
+                    "§eKlicken: Nächsten Wert einstellen"));
             int slot = 28;
             for (ArenaSpawnPoint point : spawnPoints.subList(currentPage * 16, Math.min(currentPage * 16 + 16, spawnPoints.size()))) {
                 holder.spawnEntries.put(slot, point.name());
@@ -654,6 +662,7 @@ public final class ArenaManagementMenu implements Listener {
             case "ability_roar" -> "Roar";
             case "ability_regeneration" -> "Regeneration";
             case "initial_infected" -> "Start-Infizierte";
+            case "disconnect_grace_seconds" -> "Disconnect-Kulanz";
             default -> key;
         };
     }
@@ -662,6 +671,10 @@ public final class ArenaManagementMenu implements Listener {
         if (key.equals("time_limit_seconds")) {
             int seconds = Integer.parseInt(value);
             return seconds == 0 ? "Server-Standard" : (seconds / 60) + " Minuten";
+        }
+        if (key.equals("disconnect_grace_seconds")) {
+            int seconds = Integer.parseInt(value);
+            return seconds == 0 ? "Deaktiviert" : seconds + " Sekunden";
         }
         if (key.equals("hitman_count") || key.equals("initial_infected"))
             return value.equals("0") ? "Automatisch" : value;
@@ -733,6 +746,23 @@ public final class ArenaManagementMenu implements Listener {
         } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
             player.sendMessage("§cEinstellung konnte nicht gespeichert werden: " + exception.getMessage());
             openModeSettings(player, arenaId, modeId);
+        }
+    }
+
+    private void cycleDisconnectGrace(Player player, String arenaId) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            List<String> options = List.of("0", "15", "30", "60", "90", "120", "180", "300");
+            String current = arena.modeSetting("general", "disconnect_grace_seconds", "60");
+            int index = options.indexOf(current);
+            String next = options.get((index + 1 + options.size()) % options.size());
+            plugin.getArenaService().save(arena.withModeSetting("general", "disconnect_grace_seconds", next));
+            player.sendMessage("§aDisconnect-Kulanz: §f" + settingValueLabel("disconnect_grace_seconds", next));
+            openDetails(player, arenaId);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cDisconnect-Kulanz konnte nicht gespeichert werden: " + exception.getMessage());
+            openDetails(player, arenaId);
         }
     }
 
@@ -1019,6 +1049,7 @@ public final class ArenaManagementMenu implements Listener {
                 }
                 return;
             }
+            if (slot == 26) { cycleDisconnectGrace(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String spawnName = holder.spawnActions.get(slot);
             if (spawnName != null) { setSpawn(player, holder.arenaId, spawnName); return; }
