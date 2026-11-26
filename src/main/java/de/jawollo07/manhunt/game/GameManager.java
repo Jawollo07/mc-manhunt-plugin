@@ -14,6 +14,17 @@ import java.util.UUID;
  */
 public final class GameManager {
     private Game activeGame;
+    private RematchData lastGame;
+
+    public record RematchData(String modeId, String arenaId, GameSettings settings, java.util.List<UUID> players) {
+        public RematchData {
+            players = java.util.List.copyOf(players);
+        }
+    }
+
+    public Optional<RematchData> getLastGame() {
+        return Optional.ofNullable(lastGame);
+    }
 
     public Game createGame(GameMode mode, Arena arena, GameSettings settings) {
         if (activeGame != null) {
@@ -86,6 +97,12 @@ public final class GameManager {
         if (game.getState() != GameState.RESETTING) {
             throw new IllegalStateException("Game must be reset before it can be removed");
         }
+        lastGame = new RematchData(
+                game.getMode().getId(),
+                game.getArena().id(),
+                game.getSettings(),
+                game.getPlayers().stream().map(GamePlayer::getUniqueId).toList()
+        );
         activeGame = null;
     }
 
