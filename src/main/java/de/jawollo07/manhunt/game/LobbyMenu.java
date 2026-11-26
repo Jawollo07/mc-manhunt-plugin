@@ -51,6 +51,7 @@ public final class LobbyMenu implements Listener {
 
     private void render(Player viewer, Inventory inventory) {
         inventory.clear();
+        Game game = plugin.getGameManager().getActiveGame().orElse(null);
         if (game == null) {
             inventory.setItem(4, item(Material.BOOK, "§eKeine aktive Runde",
                     "§7Aktuell wartet keine Runde auf Spieler.",
