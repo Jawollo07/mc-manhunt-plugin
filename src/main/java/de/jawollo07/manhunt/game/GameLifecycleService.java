@@ -200,6 +200,8 @@ public final class GameLifecycleService {
 
     public void finish(GameResult result) {
         Game game = requireGame();
+        // Multiple mode callbacks must not finalize the same round twice.
+        if (game.getState() == GameState.ENDING || game.getState() == GameState.RESETTING) return;
         gameManager.finish(result);
         try {
             game.getMode().onEnd(game);
