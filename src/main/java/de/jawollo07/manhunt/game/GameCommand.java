@@ -428,9 +428,36 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         plugin.getGameLifecycleService().completeReset();
     }
 
-    private void rematch(CommandSender sender) {
+    private void rematch(CommandSender sender) throws SQLException {
         requireAdmin(sender);
-        throw new IllegalStateException("Rematch wird im nächsten Teil der Lobby-Überarbeitung ergänzt.");
+        if (plugin.getGameManager().hasActiveGame()) {
+            throw new IllegalStateException("Es ist bereits eine Runde aktiv.");
+        }
+        GameManager.RematchData previous = plugin.getGameManager().getLastGame().orElseThrow(
+                () -> new IllegalStateException("Es gibt noch keine abgeschlossene Runde für ein Rematch."));
+        GameModeFactory factory = plugin.getGameModeRegistry().get(previous.modeId()).orElseThrow(
+                () -> new IllegalStateException("Der vorherige Spielmodus ist nicht mehr registriert."));
+        Arena arena = plugin.getArenaService().find(previous.arenaId()).orElseThrow(
+                () -> new IllegalStateException("Die vorherige Arena existiert nicht mehr."));
+        Game game = plugin.getGameManager().createGame(factory.createSession(), arena, previous.settings());
+        plugin.getGameManager().transition(GameState.LOBBY);
+        int rejoined = 0;
+        for (UUID id : previous.players()) {
+            Player online = Bukkit.getPlayer(id);
+            if (online == null || !online.isOnline() || game.getAvailableSlots() <= 0) continue;
+            GamePlayer participant = plugin.getGameManager().addPlayer(id);
+            try {
+                game.getMode().onPlayerJoin(game, participant);
+                rejoined++;
+            } catch (RuntimeException exception) {
+                plugin.getGameManager().removePlayer(id);
+                plugin.getLogger().warning("Could not rejoin " + id + " to rematch: " + exception.getMessage());
+            }
+        }
+        Bukkit.broadcastMessage("§6[ManHunt] §eRematch gestartet: §f" + factory.getDisplayName()
+                + " §7auf §f" + arena.displayName() + "§7. §a" + rejoined + " §7Spieler sind zurück.");
+        broadcastLobbyStatus(game);
+        maybeStartCountdown(game);
     }
 
     private void reset(CommandSender sender) {
