@@ -73,6 +73,7 @@ public final class GamePlayer {
     public boolean hasExceededDisconnectGrace(java.time.Duration grace, java.time.Instant now) {
         Objects.requireNonNull(grace, "grace");
         Objects.requireNonNull(now, "now");
+        if (grace.isZero() || grace.isNegative()) return false;
         return status == PlayerStatus.DISCONNECTED && !disconnectExpired
                 && disconnectedAt != null && !now.isBefore(disconnectedAt.plus(grace));
     }
