@@ -288,7 +288,21 @@ Zum Verlassen der Lobby:
 
 Die Lobby zeigt Modus, Arena, Online-Spieler, freie Plätze, Teams und Startbereitschaft. Offline-Spieler zählen nicht zur Mindestspielerzahl.
 
-Sobald genügend Spieler online sind, kann der Countdown automatisch beginnen. Ein Admin kann ihn auch manuell starten:
+Spieler können ihre Bereitschaft über den Lobby-Menüpunkt **Bereitschaft** oder per Befehl umschalten:
+
+```
+/manhunt game ready
+```
+
+Die Bereitschaft ist standardmäßig optional. Mit `game.require-ready: true` müssen alle online teilnehmenden Spieler bereit sein, bevor der automatische oder manuelle Countdown starten kann. Wenn während des Countdowns jemand seine Bereitschaft zurücknimmt, wird der Countdown pausiert.
+
+Wenn Arena-Abstimmungen aktiviert sind, können Spieler eine Arena vorschlagen und dafür stimmen:
+
+```
+/manhunt game vote <arena>
+```
+
+Jeder Spieler hat eine Stimme und kann sie ändern. Bei Gleichstand entscheidet die alphabetische Arena-ID. Die Gewinner-Arena wird beim Start des Countdowns übernommen; sie muss den aktuellen Spielmodus unterstützen. Ein Admin kann ihn auch manuell starten:
 
 ```
 /manhunt game start
@@ -335,6 +349,16 @@ Oder die Runde zurücksetzen:
 
 Die Admin-GUI bietet dieselben Aktionen. Ein Reset sollte nur genutzt werden, wenn die Runde beendet bzw. die Arena freigegeben werden soll.
 
+### Rematch
+
+Nach dem vollständigen Reset kann ein Administrator dieselbe Konfiguration erneut erstellen:
+
+```
+/manhunt game rematch
+```
+
+Das Rematch übernimmt Modus, Arena und Rundenlimits der letzten Runde. Frühere Teilnehmer, die noch online sind, werden automatisch wieder in die neue Lobby eingeladen. Alternativ ist das Rematch im Lobby-Menü verfügbar, solange keine Runde aktiv ist.
+
 ## 10. Statistiken
 
 Spieler können ihre Statistiken ansehen:
@@ -376,6 +400,8 @@ Wichtige Werte:
 | `game.allow-late-join` | `false` | Später Beitritt |
 | `game.allow-spectators` | `true` | Zuschauer zulassen |
 | `game.result-display-seconds` | `8` | Ergebnisanzeige vor dem Reset (0–60) |
+| `game.require-ready` | `false` | Alle Online-Spieler müssen vor dem Countdown bereit sein |
+| `game.arena-voting` | `true` | Arena-Abstimmungen in der Lobby erlauben |
 | `maps.create-working-copy` | `true` | Temporäre Kartenkopie erstellen |
 | `maps.delete-working-copy-after-game` | `true` | Temporäre Kopie nach der Runde entfernen |
 | `general.debug` | `false` | Debug-Ausgaben |
