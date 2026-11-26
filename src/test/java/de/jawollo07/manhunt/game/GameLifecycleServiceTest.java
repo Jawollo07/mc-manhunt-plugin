@@ -37,6 +37,59 @@ class GameLifecycleServiceTest {
     }
 
     @Test
+    void expiresDisconnectedParticipantsAfterTheArenaGracePeriod() {
+        AtomicInteger quitCallbacks = new AtomicInteger();
+        AtomicInteger ticks = new AtomicInteger();
+        GameMode mode = new GameMode() {
+            @Override public String getId() { return "test"; }
+            @Override public String getDisplayName() { return "Test"; }
+            @Override public void onPlayerQuit(Game game, GamePlayer player) { quitCallbacks.incrementAndGet(); }
+            @Override public void onTick(Game game, long elapsedSeconds) { ticks.incrementAndGet(); }
+        };
+        GameManager manager = new GameManager();
+        Game game = manager.createGame(mode, new Arena("test", "Test Arena", "test_world"),
+                new GameSettings(1, 2, 0, 300, false, true));
+        GamePlayer player = manager.addPlayer(UUID.randomUUID());
+        player.setStatus(de.jawollo07.manhunt.player.PlayerStatus.PLAYING);
+        player.disconnect(Instant.now().minusSeconds(61));
+        manager.transition(GameState.STARTING);
+        manager.transition(GameState.RUNNING);
+
+        new GameLifecycleService(manager).tick(1);
+
+        assertEquals(1, quitCallbacks.get());
+        assertEquals(1, ticks.get());
+        assertTrue(player.isEliminated());
+        assertFalse(player.isActiveForRound());
+        assertFalse(player.isConnected());
+    }
+
+    @Test
+    void disabledArenaDisconnectGraceKeepsDisconnectedPlayerAlive() {
+        AtomicInteger quitCallbacks = new AtomicInteger();
+        GameMode mode = new GameMode() {
+            @Override public String getId() { return "test"; }
+            @Override public String getDisplayName() { return "Test"; }
+            @Override public void onPlayerQuit(Game game, GamePlayer player) { quitCallbacks.incrementAndGet(); }
+        };
+        Arena arena = new Arena("test", "Test Arena", "test_world")
+                .withModeSetting("general", "disconnect_grace_seconds", "0");
+        GameManager manager = new GameManager();
+        Game game = manager.createGame(mode, arena, new GameSettings(1, 2, 0, 300, false, true));
+        GamePlayer player = manager.addPlayer(UUID.randomUUID());
+        player.setStatus(de.jawollo07.manhunt.player.PlayerStatus.PLAYING);
+        player.disconnect(Instant.now().minusSeconds(3600));
+        manager.transition(GameState.STARTING);
+        manager.transition(GameState.RUNNING);
+
+        new GameLifecycleService(manager).tick(1);
+
+        assertEquals(0, quitCallbacks.get());
+        assertTrue(player.isActiveForRound());
+        assertFalse(player.isConnected());
+    }
+
+    @Test
     void randomTeamDistributionDefaultsToEnabledAndCanBeDisabled() {
         GameSettings defaults = new GameSettings(2, 8, 5, 300, false, true);
         GameSettings ordered = new GameSettings(2, 8, 5, 300, false, true, false);
