@@ -9,6 +9,8 @@ game:
   allow-late-join: false
   allow-spectators: true
   result-display-seconds: 8
+  require-ready: false
+  arena-voting: true
 
 maps:
   create-working-copy: true
