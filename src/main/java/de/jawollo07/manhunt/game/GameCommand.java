@@ -130,7 +130,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         plugin.getGameManager().removePlayer(player.getUniqueId());
         Bukkit.broadcastMessage("§e" + player.getName() + " §7hat die Runde verlassen.");
         if (game.getState() == GameState.COUNTDOWN
-                && game.getPlayerCount() < game.getSettings().minPlayers()) {
+                && onlinePlayerCount(game) < game.getSettings().minPlayers()) {
             cancelCountdownTask();
             plugin.getGameManager().transition(GameState.LOBBY);
             Bukkit.broadcastMessage("§c[ManHunt] Zu wenige Spieler – der Countdown wurde pausiert.");
@@ -145,9 +145,9 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         if (game.getState() != GameState.WAITING && game.getState() != GameState.LOBBY) {
             throw new IllegalStateException("Die Runde kann in diesem Status nicht gestartet werden.");
         }
-        if (game.getPlayerCount() < game.getSettings().minPlayers()) {
-            throw new IllegalStateException("Nicht genügend Spieler: benötigt werden "
-                    + game.getSettings().minPlayers() + ", vorhanden sind " + game.getPlayerCount() + ".");
+        if (onlinePlayerCount(game) < game.getSettings().minPlayers()) {
+            throw new IllegalStateException("Nicht genügend Spieler online: benötigt werden "
+                    + game.getSettings().minPlayers() + ", online sind " + onlinePlayerCount(game) + ".");
         }
 
         beginCountdown(game);
@@ -167,24 +167,25 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     private void maybeStartCountdown(Game game) {
         if (countdownTask != null || game.getState() == GameState.COUNTDOWN) return;
         if ((game.getState() == GameState.WAITING || game.getState() == GameState.LOBBY)
-                && game.getPlayerCount() >= game.getSettings().minPlayers()) {
+                && onlinePlayerCount(game) >= game.getSettings().minPlayers()) {
             beginCountdown(game);
         }
     }
 
     private void beginCountdown(Game game) {
         if (countdownTask != null) return;
-        if (game.getPlayerCount() < game.getSettings().minPlayers()) {
+        if (onlinePlayerCount(game) < game.getSettings().minPlayers()) {
             throw new IllegalStateException("Es fehlen noch "
-                    + (game.getSettings().minPlayers() - game.getPlayerCount()) + " Spieler.");
+                    + (game.getSettings().minPlayers() - onlinePlayerCount(game)) + " Spieler.");
         }
         if (game.getState() != GameState.COUNTDOWN) {
             plugin.getGameManager().transition(GameState.COUNTDOWN);
         }
         countdownRemaining = game.getSettings().countdownSeconds();
         game.setCountdownRemainingSeconds(countdownRemaining);
-        Bukkit.broadcastMessage("§6[ManHunt] §eGenügend Spieler! Die Runde startet in "
-                + countdownRemaining + " Sekunden.");
+        Bukkit.broadcastMessage("§6[ManHunt] §e" + game.getMode().getDisplayName() + " startet in "
+                + countdownRemaining + " Sekunden auf §f" + game.getArena().displayName() + "§e.");
+        announceCountdown(game, countdownRemaining);
         playGameSound(game, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 1.2f);
         if (countdownRemaining <= 0) {
             countdownRemaining = -1;
@@ -198,10 +199,10 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                 cancelCountdownTask();
                 return;
             }
-            if (game.getPlayerCount() < game.getSettings().minPlayers()) {
+            if (onlinePlayerCount(game) < game.getSettings().minPlayers()) {
                 cancelCountdownTask();
                 plugin.getGameManager().transition(GameState.LOBBY);
-                Bukkit.broadcastMessage("§c[ManHunt] Zu wenige Spieler – Countdown pausiert.");
+                Bukkit.broadcastMessage("§c[ManHunt] Zu wenige Spieler online – Countdown pausiert.");
                 broadcastLobbyStatus(game);
                 return;
             }
@@ -211,7 +212,9 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                 cancelCountdownTask();
                 launch(game);
             } else if (countdownRemaining <= 5 || countdownRemaining % 5 == 0) {
-                Bukkit.broadcastMessage("§6[ManHunt] §eStart in " + countdownRemaining + "...");
+                Bukkit.broadcastMessage("§6[ManHunt] §e" + game.getMode().getDisplayName()
+                        + " startet in " + countdownRemaining + "...");
+                announceCountdown(game, countdownRemaining);
                 playGameSound(game, Sound.BLOCK_NOTE_BLOCK_HAT, 0.7f, countdownRemaining <= 3 ? 1.6f : 1.2f);
             }
         }, 20L, 20L);
@@ -227,18 +230,79 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     }
 
     private void broadcastLobbyStatus(Game game) {
-        Bukkit.broadcastMessage("§6[ManHunt-Lobby] §7Spieler: §e" + game.getPlayerCount()
-                + "/" + game.getSettings().maxPlayers() + " §8| §7Benötigt: §e"
+        Bukkit.broadcastMessage("§6[ManHunt-Lobby] §7Spieler online: §e" + onlinePlayerCount(game)
+                + "§7/§f" + game.getSettings().maxPlayers() + " §8| §7Benötigt: §e"
                 + game.getSettings().minPlayers());
         String names = game.getPlayers().stream()
                 .map(participant -> {
                     Player online = Bukkit.getPlayer(participant.getUniqueId());
-                    if (online != null) return online.getName();
-                    String name = Bukkit.getOfflinePlayer(participant.getUniqueId()).getName();
-                    return name == null ? participant.getUniqueId().toString().substring(0, 8) : name;
+                    if (online == null || !online.isOnline()) return null;
+                    return online.getName();
                 })
+                .filter(java.util.Objects::nonNull)
                 .collect(java.util.stream.Collectors.joining("§7, §f"));
-        Bukkit.broadcastMessage("§7Dabei: " + (names.isEmpty() ? "§8Noch niemand" : "§f" + names));
+        Bukkit.broadcastMessage("§7Online dabei: " + (names.isEmpty() ? "§8Noch niemand" : "§f" + names));
+        String distribution = teamDistributionSummary(game);
+        if (!distribution.isBlank()) Bukkit.broadcastMessage("§7Teamwünsche: §f" + distribution);
+    }
+
+    private int onlinePlayerCount(Game game) {
+        return (int) game.getPlayers().stream()
+                .filter(participant -> {
+                    Player player = Bukkit.getPlayer(participant.getUniqueId());
+                    return player != null && player.isOnline();
+                }).count();
+    }
+
+    private String teamDistributionSummary(Game game) {
+        List<String> keys = switch (game.getMode().getId().toLowerCase(Locale.ROOT)) {
+            case "hitman" -> List.of("hitmen", "survivors");
+            case "juggernaut" -> List.of("juggernaut", "hunters");
+            case "infection" -> List.of("infected", "survivors");
+            default -> List.of();
+        };
+        if (keys.isEmpty()) return "";
+        List<String> parts = new java.util.ArrayList<>();
+        for (String key : keys) {
+            long count = game.getPlayers().stream()
+                    .filter(p -> {
+                        Player online = Bukkit.getPlayer(p.getUniqueId());
+                        return online != null && online.isOnline()
+                                && game.getLobbyTeamPreference(p.getUniqueId()).orElse("").equals(key);
+                    }).count();
+            parts.add(teamPreferenceLabel(key) + ": " + count);
+        }
+        long automatic = game.getPlayers().stream()
+                .filter(p -> {
+                    Player online = Bukkit.getPlayer(p.getUniqueId());
+                    return online != null && online.isOnline()
+                            && game.getLobbyTeamPreference(p.getUniqueId()).isEmpty();
+                }).count();
+        parts.add("Automatisch: " + automatic);
+        return String.join(" | ", parts);
+    }
+
+    private String teamPreferenceLabel(String key) {
+        return switch (key) {
+            case "hitmen" -> "Hitmen";
+            case "survivors" -> "Überlebende";
+            case "juggernaut" -> "Juggernaut";
+            case "hunters" -> "Jäger";
+            case "infected" -> "Infizierte";
+            default -> key;
+        };
+    }
+
+    private void announceCountdown(Game game, int seconds) {
+        String title = seconds <= 3 ? "§c" + seconds : "§e" + seconds;
+        String subtitle = "§f" + game.getMode().getDisplayName() + " §7• §f" + game.getArena().displayName();
+        for (GamePlayer participant : game.getPlayers()) {
+            Player online = Bukkit.getPlayer(participant.getUniqueId());
+            if (online == null || !online.isOnline()) continue;
+            online.sendTitle(title, subtitle, 0, 25, 5);
+            online.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "§e" + game.getMode().getDisplayName() + " §7| §f" + seconds + "s bis zum Start"));
+        }
     }
 
     private void launch(Game game) {
