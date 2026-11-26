@@ -74,7 +74,10 @@ public final class LobbyMenu implements Listener {
         }
 
         long onlineCount = game.getPlayers().stream()
-                .filter(participant -> Bukkit.getPlayer(participant.getUniqueId()) != null).count();
+                .filter(participant -> {
+                    Player online = Bukkit.getPlayer(participant.getUniqueId());
+                    return online != null && online.isOnline();
+                }).count();
         int required = game.getSettings().minPlayers();
         boolean enoughPlayers = onlineCount >= required;
         inventory.setItem(2, item(Material.CLOCK, "§6" + stateName(game.getState()),
@@ -90,13 +93,14 @@ public final class LobbyMenu implements Listener {
         inventory.setItem(6, item(Material.PLAYER_HEAD, "§aSpieler: §f" + onlineCount
                         + "§7/§f" + game.getSettings().maxPlayers(),
                 "§7Mindestens benötigt: §f" + required,
-                "§7Freie Plätze: §f" + game.getAvailableSlots(),
-                "§7Offline-Spieler werden in der Lobby nicht mitgezählt."));
+                "§7Freie Plätze: §f" + Math.max(0, game.getSettings().maxPlayers() - onlineCount),
+                "§7Offline-Spieler zählen nicht für den Start."));
 
         Material readiness = enoughPlayers ? Material.LIME_CONCRETE : Material.YELLOW_CONCRETE;
         inventory.setItem(8, item(readiness,
                 enoughPlayers ? "§aBereit für den Spielstart" : "§eWarte auf weitere Spieler",
                 "§7Online: §f" + onlineCount + "§7/§f" + required + " §7benötigt",
+                "§7Modus: §f" + game.getMode().getDisplayName(),
                 game.getState() == GameState.COUNTDOWN
                         ? "§eCountdown: §f" + Math.max(0, game.getCountdownRemainingSeconds()) + "s"
                         : enoughPlayers ? "§7Der Countdown startet automatisch."
