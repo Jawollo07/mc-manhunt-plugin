@@ -241,45 +241,10 @@ public final class BuiltinGameModes {
         protected List<GamePlayer> orderedForTeams(Game game, List<GamePlayer> source,
                                                    String primaryKey, String secondaryKey,
                                                    int primaryCapacity) {
-            List<GamePlayer> shuffled = new ArrayList<>(source);
-            if (game.getSettings().randomTeamDistribution()) Collections.shuffle(shuffled);
-            List<GamePlayer> primaryWishes = new ArrayList<>();
-            List<GamePlayer> secondaryWishes = new ArrayList<>();
-            List<GamePlayer> neutral = new ArrayList<>();
-            for (GamePlayer player : shuffled) {
-                String preference = game.getLobbyTeamPreference(player.getUniqueId()).orElse("");
-                if (preference.equals(primaryKey)) primaryWishes.add(player);
-                else if (preference.equals(secondaryKey)) secondaryWishes.add(player);
-                else neutral.add(player);
-            }
-
-            int secondaryCapacity = shuffled.size() - primaryCapacity;
-            List<GamePlayer> primary = take(primaryWishes, primaryCapacity);
-            List<GamePlayer> secondary = take(secondaryWishes, secondaryCapacity);
-            List<GamePlayer> overflow = new ArrayList<>();
-            overflow.addAll(primaryWishes.subList(primary.size(), primaryWishes.size()));
-            overflow.addAll(secondaryWishes.subList(secondary.size(), secondaryWishes.size()));
-
-            fill(primary, neutral, primaryCapacity);
-            fill(secondary, neutral, secondaryCapacity);
-            fill(primary, overflow, primaryCapacity);
-            fill(secondary, overflow, secondaryCapacity);
-
-            List<GamePlayer> ordered = new ArrayList<>(shuffled.size());
-            ordered.addAll(primary);
-            ordered.addAll(secondary);
-            return ordered;
-        }
-
-        private List<GamePlayer> take(List<GamePlayer> source, int capacity) {
-            int count = Math.min(source.size(), Math.max(0, capacity));
-            return new ArrayList<>(source.subList(0, count));
-        }
-
-        private void fill(List<GamePlayer> target, List<GamePlayer> source, int capacity) {
-            while (target.size() < capacity && !source.isEmpty()) {
-                target.add(source.remove(0));
-            }
+            return TeamDistribution.order(source,
+                    player -> game.getLobbyTeamPreference(player.getUniqueId()).orElse(""),
+                    game.getSettings().randomTeamDistribution(),
+                    primaryKey, secondaryKey, primaryCapacity);
         }
 
         protected long countActiveTeamMembers(Game game, Team team) {
