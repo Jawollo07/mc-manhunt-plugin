@@ -168,6 +168,9 @@ public final class LobbyMenu implements Listener {
         String time = seconds <= 0 ? "Kein Zeitlimit" : (seconds / 60) + " Minuten";
         List<String> lines = new ArrayList<>();
         lines.add("§7Zeitlimit: §f" + time);
+        int disconnectGrace = game.getArena().modeIntSetting("general", "disconnect_grace_seconds", 60);
+        lines.add("§7Disconnect-Kulanz: §f" + (disconnectGrace <= 0
+                ? "Deaktiviert" : disconnectGrace + " Sekunden"));
         switch (mode) {
             case "assassin" -> {
                 String distribution = game.getArena().modeSetting(mode, "target_distribution", "cycle");
