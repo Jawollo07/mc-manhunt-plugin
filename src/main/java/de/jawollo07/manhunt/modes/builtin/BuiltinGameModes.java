@@ -337,11 +337,21 @@ public final class BuiltinGameModes {
         @Override public void onPlayerJoin(Game game, GamePlayer player) {
             super.onPlayerJoin(game, player);
             if (player.getStatus() != PlayerStatus.PLAYING) return;
+
             UUID target = targets.get(player.getUniqueId());
             if (target == null) {
                 setTarget(game, player.getUniqueId(), null, "§aDu bist zurück! Neues Ziel");
             } else {
                 sendTarget(player.getUniqueId(), target, "§aWillkommen zurück! Dein Ziel");
+            }
+
+            // A two-player round can leave the connected hunter without a
+            // target while the other player is offline. Rebuild every missing
+            // assignment once both participants are back in the round.
+            for (UUID hunterId : activePlayers(game)) {
+                if (!targets.containsKey(hunterId)) {
+                    setTarget(game, hunterId, null, "§aDein Ziel wurde neu zugewiesen");
+                }
             }
         }
 
