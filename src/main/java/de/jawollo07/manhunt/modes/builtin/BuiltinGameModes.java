@@ -84,6 +84,9 @@ public final class BuiltinGameModes {
             String time = limit > 0 ? (limit / 60) + " Minuten" : "unbegrenzt";
             List<String> details = new ArrayList<>();
             details.add("Zeitlimit: " + time);
+            int disconnectGrace = game.getArena().modeIntSetting("general", "disconnect_grace_seconds", 60);
+            details.add("Disconnect-Kulanz: " + (disconnectGrace <= 0
+                    ? "deaktiviert" : disconnectGrace + " Sekunden"));
             switch (mode.toLowerCase(java.util.Locale.ROOT)) {
                 case "assassin" -> details.add("Zielverteilung: "
                         + (game.getArena().modeSetting(mode, "target_distribution", "cycle").equalsIgnoreCase("random")
