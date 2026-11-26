@@ -48,11 +48,14 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                 case "create" -> create(sender, args);
                 case "join" -> join(sender);
                 case "leave" -> leave(sender);
+                case "ready" -> ready(sender);
+                case "vote" -> vote(sender, args);
                 case "start" -> start(sender);
                 case "cancel" -> cancelCountdown(sender);
                 case "status", "lobby" -> status(sender);
                 case "stop" -> stop(sender, args);
                 case "reset" -> reset(sender);
+                case "rematch" -> rematch(sender);
                 default -> help(sender, label);
             }
         } catch (SQLException exception) {
@@ -149,6 +152,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
             throw new IllegalStateException("Nicht genügend Spieler online: benötigt werden "
                     + game.getSettings().minPlayers() + ", online sind " + onlinePlayerCount(game) + ".");
         }
+        if (!readinessSatisfied(game)) throw new IllegalStateException("Noch nicht alle Spieler sind bereit.");
 
         beginCountdown(game);
     }
@@ -167,7 +171,7 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     private void maybeStartCountdown(Game game) {
         if (countdownTask != null || game.getState() == GameState.COUNTDOWN) return;
         if ((game.getState() == GameState.WAITING || game.getState() == GameState.LOBBY)
-                && onlinePlayerCount(game) >= game.getSettings().minPlayers()) {
+                && onlinePlayerCount(game) >= game.getSettings().minPlayers() && readinessSatisfied(game)) {
             beginCountdown(game);
         }
     }
@@ -178,6 +182,8 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
             throw new IllegalStateException("Es fehlen noch "
                     + (game.getSettings().minPlayers() - onlinePlayerCount(game)) + " Spieler.");
         }
+        if (!readinessSatisfied(game)) throw new IllegalStateException("Es sind noch nicht alle Spieler bereit.");
+        applyArenaVote(game);
         if (game.getState() != GameState.COUNTDOWN) {
             plugin.getGameManager().transition(GameState.COUNTDOWN);
         }
@@ -199,10 +205,10 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                 cancelCountdownTask();
                 return;
             }
-            if (onlinePlayerCount(game) < game.getSettings().minPlayers()) {
+            if (onlinePlayerCount(game) < game.getSettings().minPlayers() || !readinessSatisfied(game)) {
                 cancelCountdownTask();
                 plugin.getGameManager().transition(GameState.LOBBY);
-                Bukkit.broadcastMessage("§c[ManHunt] Zu wenige Spieler online – Countdown pausiert.");
+                Bukkit.broadcastMessage("§c[ManHunt] Spieler fehlen oder sind nicht bereit – Countdown pausiert.");
                 broadcastLobbyStatus(game);
                 return;
             }
@@ -242,8 +248,79 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
                 .filter(java.util.Objects::nonNull)
                 .collect(java.util.stream.Collectors.joining("§7, §f"));
         Bukkit.broadcastMessage("§7Online dabei: " + (names.isEmpty() ? "§8Noch niemand" : "§f" + names));
+        if (plugin.getConfigManager().getBoolean("game.require-ready", false)) {
+            Bukkit.broadcastMessage("§7Bereit: §a" + onlineReadyCount(game) + "§7/§f" + onlinePlayerCount(game));
+        }
         String distribution = teamDistributionSummary(game);
         if (!distribution.isBlank()) Bukkit.broadcastMessage("§7Teamwünsche: §f" + distribution);
+    }
+
+    private boolean readinessSatisfied(Game game) {
+        if (!plugin.getConfigManager().getBoolean("game.require-ready", false)) return true;
+        return game.areAllPlayersReady(id -> {
+            Player player = Bukkit.getPlayer(id);
+            return player != null && player.isOnline();
+        });
+    }
+
+    private int onlineReadyCount(Game game) {
+        return (int) game.getPlayers().stream().filter(p -> {
+            Player player = Bukkit.getPlayer(p.getUniqueId());
+            return player != null && player.isOnline() && game.isReady(p.getUniqueId());
+        }).count();
+    }
+
+    private void ready(CommandSender sender) {
+        Player player = requirePlayer(sender);
+        Game game = requireGame();
+        boolean ready = game.toggleReady(player.getUniqueId());
+        player.sendMessage(ready ? "§aDu bist jetzt bereit." : "§eDu bist nicht mehr bereit.");
+        Bukkit.broadcastMessage("§6[ManHunt] §e" + player.getName() + (ready ? " §7ist bereit." : " §7ist nicht mehr bereit.")
+                + " §8(" + onlineReadyCount(game) + "/" + onlinePlayerCount(game) + ")");
+        if (game.getState() == GameState.COUNTDOWN && !readinessSatisfied(game)) {
+            cancelCountdownTask();
+            plugin.getGameManager().transition(GameState.LOBBY);
+            Bukkit.broadcastMessage("§c[ManHunt] Countdown pausiert – es fehlen Bereitschaften.");
+        } else {
+            maybeStartCountdown(game);
+        }
+    }
+
+    private void vote(CommandSender sender, String[] args) throws SQLException {
+        Player player = requirePlayer(sender);
+        requireArgs(args, 3, "Verwendung: /manhunt game vote <arena>");
+        Game game = requireGame();
+        Arena arena = plugin.getArenaService().find(args[2]).orElseThrow(
+                () -> new IllegalArgumentException("Arena nicht gefunden: " + args[2]));
+        if (!arena.supportsMode(game.getMode().getId())) {
+            throw new IllegalArgumentException("Diese Arena unterstützt den aktuellen Spielmodus nicht.");
+        }
+        game.castArenaVote(player.getUniqueId(), arena.id());
+        Bukkit.broadcastMessage("§6[ManHunt] §e" + player.getName() + " §7hat für §f"
+                + arena.displayName() + " §7gestimmt.");
+        broadcastArenaVotes(game);
+    }
+
+    private void broadcastArenaVotes(Game game) {
+        if (game.getArenaVoteCounts().isEmpty()) return;
+        String summary = game.getArenaVoteCounts().entrySet().stream()
+                .map(entry -> entry.getKey() + ": " + entry.getValue())
+                .collect(java.util.stream.Collectors.joining(" §8| §f"));
+        Bukkit.broadcastMessage("§7Arena-Abstimmung: §f" + summary);
+    }
+
+    private void applyArenaVote(Game game) {
+        if (!plugin.getConfigManager().getBoolean("game.arena-voting", true)) return;
+        String winner = game.getWinningArenaVote().orElse(null);
+        if (winner == null || winner.equalsIgnoreCase(game.getArena().id())) return;
+        try {
+            Arena selected = plugin.getArenaService().find(winner).orElse(null);
+            if (selected == null || !selected.supportsMode(game.getMode().getId())) return;
+            game.setArena(selected);
+            Bukkit.broadcastMessage("§6[ManHunt] Arena-Abstimmung gewonnen: §e" + selected.displayName());
+        } catch (SQLException exception) {
+            plugin.getLogger().warning("Could not resolve voted arena: " + exception.getMessage());
+        }
     }
 
     private int onlinePlayerCount(Game game) {
@@ -351,6 +428,11 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         plugin.getGameLifecycleService().completeReset();
     }
 
+    private void rematch(CommandSender sender) {
+        requireAdmin(sender);
+        throw new IllegalStateException("Rematch wird im nächsten Teil der Lobby-Überarbeitung ergänzt.");
+    }
+
     private void reset(CommandSender sender) {
         requireAdmin(sender);
         Game game = requireGame();
@@ -378,6 +460,8 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§7Status: §e" + game.getState());
         sender.sendMessage("§7Spieler: §e" + game.getPlayerCount() + "/" + game.getSettings().maxPlayers()
                 + " §8| §7Minimum: §e" + game.getSettings().minPlayers());
+        sender.sendMessage("§7Bereit: §a" + onlineReadyCount(game) + "§7/§f" + onlinePlayerCount(game));
+        if (!game.getArenaVoteCounts().isEmpty()) broadcastArenaVotes(game);
         String names = game.getPlayers().stream().map(participant -> {
             Player online = Bukkit.getPlayer(participant.getUniqueId());
             if (online != null) return online.getName();
@@ -426,12 +510,15 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/" + label + " game create <modus> <arena> §7(Admin)");
         sender.sendMessage("§e/" + label + " game join");
         sender.sendMessage("§e/" + label + " game leave");
+        sender.sendMessage("§e/" + label + " game ready §7(Bereitschaft umschalten)");
+        sender.sendMessage("§e/" + label + " game vote <arena> §7(Arena-Abstimmung)");
         sender.sendMessage("§e/" + label + " game start §7(Admin)");
         sender.sendMessage("§e/" + label + " game cancel §7(Countdown abbrechen, Admin)");
         sender.sendMessage("§e/" + label + " game status");
         sender.sendMessage("§e/" + label + " game lobby");
         sender.sendMessage("§e/" + label + " game stop [Grund] §7(Admin)");
         sender.sendMessage("§e/" + label + " game reset §7(Admin)");
+        sender.sendMessage("§e/" + label + " game rematch §7(Admin)");
         sender.sendMessage("§e/" + label + " modes");
     }
 
@@ -508,9 +595,15 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 2 && args[0].equalsIgnoreCase("game")) {
             List<String> actions = sender.hasPermission("manhunt.admin")
-                    ? List.of("create", "join", "leave", "start", "cancel", "status", "lobby", "stop", "reset")
-                    : List.of("join", "leave", "status", "lobby");
+                    ? List.of("create", "join", "leave", "ready", "vote", "start", "cancel", "status", "lobby", "stop", "reset", "rematch")
+                    : List.of("join", "leave", "ready", "vote", "status", "lobby");
             return filter(actions, args[1]);
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("vote")) {
+            try { return filter(plugin.getArenaService().findAll().stream()
+                    .filter(arena -> plugin.getGameManager().getActiveGame().map(game -> arena.supportsMode(game.getMode().getId())).orElse(false))
+                    .map(Arena::id).toList(), args[2]); }
+            catch (SQLException exception) { return List.of(); }
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("create")
                 && sender.hasPermission("manhunt.admin")) {
