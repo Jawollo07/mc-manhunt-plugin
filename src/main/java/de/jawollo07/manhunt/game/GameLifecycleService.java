@@ -250,6 +250,11 @@ public final class GameLifecycleService {
         GamePlayer player = game.getPlayer(playerId).orElseThrow(
                 () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
         );
+        // A disconnect during STARTING must preserve a live round status:
+        // BaseMode.onStart runs after the player may already have left.
+        if (game.getState() == GameState.STARTING && !player.isEliminated()) {
+            player.setStatus(de.jawollo07.manhunt.player.PlayerStatus.PLAYING);
+        }
         // Keep the participant alive during the arena-specific grace period.
         // Mode callbacks run only if the player fails to return in time.
         player.disconnect();
