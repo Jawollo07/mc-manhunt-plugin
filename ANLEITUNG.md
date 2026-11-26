@@ -288,6 +288,15 @@ Zum Verlassen der Lobby:
 
 Die Lobby zeigt Modus, Arena, Online-Spieler, freie Plätze, Teams und Startbereitschaft. Offline-Spieler zählen nicht zur Mindestspielerzahl.
 
+Spieler können Freunde direkt einladen. Der eingeladene Spieler nimmt die Einladung mit `/manhunt game accept` an:
+
+```
+/manhunt game invite <spieler>
+/manhunt game accept
+```
+
+Der Einladende muss selbst in der Lobby sein. Einladungen gelten nur für die aktuelle Lobby.
+
 Spieler können ihre Bereitschaft über den Lobby-Menüpunkt **Bereitschaft** oder per Befehl umschalten:
 
 ```
