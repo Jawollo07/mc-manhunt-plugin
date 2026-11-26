@@ -24,6 +24,34 @@ class GamePlayerTest {
     }
 
     @Test
+    void activeParticipantRemainsAliveDuringTemporaryDisconnect() {
+        GamePlayer player = new GamePlayer(UUID.randomUUID());
+        player.setStatus(PlayerStatus.PLAYING);
+
+        assertTrue(player.isActiveForRound());
+        player.disconnect();
+
+        assertEquals(PlayerStatus.DISCONNECTED, player.getStatus());
+        assertTrue(player.isActiveForRound());
+        player.reconnect();
+        assertTrue(player.isActiveForRound());
+        assertEquals(PlayerStatus.PLAYING, player.getStatus());
+    }
+
+    @Test
+    void eliminatedParticipantDoesNotBecomeActiveDuringDisconnect() {
+        GamePlayer player = new GamePlayer(UUID.randomUUID());
+        player.setStatus(PlayerStatus.ELIMINATED);
+        player.disconnect();
+
+        assertFalse(player.isActiveForRound());
+        assertTrue(player.isEliminated());
+        player.reconnect();
+        assertFalse(player.isActiveForRound());
+        assertEquals(PlayerStatus.ELIMINATED, player.getStatus());
+    }
+
+    @Test
     void reconnectRestoresWaitingStatusForLobbyDisconnect() {
         GamePlayer player = new GamePlayer(UUID.randomUUID());
         player.disconnect();
