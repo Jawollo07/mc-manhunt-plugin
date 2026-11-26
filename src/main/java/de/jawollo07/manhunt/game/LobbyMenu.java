@@ -170,6 +170,9 @@ public final class LobbyMenu implements Listener {
                         ? "§eAlle Spieler müssen bereit sein." : "§8Bereitschaft ist optional."));
         inventory.setItem(47, item(Material.SHIELD, "§bTeamübersicht",
                 teamLore(game).toArray(String[]::new)));
+        inventory.setItem(52, item(Material.FIREWORK_ROCKET, "§bSpieler einladen",
+                "§7Lade Freunde direkt in die Lobby ein.",
+                "§e/manhunt game invite <spieler>"));
         inventory.setItem(51, item(Material.FILLED_MAP, "§eArena-Abstimmung",
                 "§7Deine Stimme: §f" + game.getArenaVote(viewer.getUniqueId()).orElse("Keine"),
                 "§7Stimmen: §f" + game.getArenaVoteCounts().values().stream().mapToLong(Long::longValue).sum(),
@@ -300,6 +303,10 @@ public final class LobbyMenu implements Listener {
         if (slot == 49 && game == null && player.hasPermission("manhunt.admin")) {
             player.closeInventory();
             Bukkit.dispatchCommand(player, "manhunt game rematch");
+            return;
+        }
+        if (slot == 52) {
+            player.sendMessage("§6[ManHunt] §7Lade Spieler mit §e/manhunt game invite <spieler> §7ein.");
             return;
         }
         if (slot == 51) {
