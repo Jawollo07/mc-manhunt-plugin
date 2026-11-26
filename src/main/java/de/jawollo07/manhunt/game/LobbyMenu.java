@@ -51,7 +51,6 @@ public final class LobbyMenu implements Listener {
 
     private void render(Player viewer, Inventory inventory) {
         inventory.clear();
-        Game game = plugin.getGameManager().getActiveGame().orElse(null);
         if (game == null) {
             inventory.setItem(4, item(Material.BOOK, "§eKeine aktive Runde",
                     "§7Aktuell wartet keine Runde auf Spieler.",
@@ -69,6 +68,12 @@ public final class LobbyMenu implements Listener {
                     viewer.hasPermission("manhunt.admin") ? "§7Öffnet die Admin-Auswahl für Modus und Arena."
                             : "§7Sobald ein Admin eine Runde erstellt,",
                     viewer.hasPermission("manhunt.admin") ? "§eKlicken zum Erstellen" : "§7kannst du hier direkt beitreten."));
+            if (viewer.hasPermission("manhunt.admin") && plugin.getGameManager().getLastGame().isPresent()) {
+                inventory.setItem(49, item(Material.REPEATER, "§a§lLetzte Runde wiederholen",
+                        "§7Erstellt dieselbe Runde erneut.",
+                        "§7Vorherige Online-Spieler werden eingeladen.",
+                        "§eKlicken zum Rematch"));
+            }
             inventory.setItem(REFRESH_SLOT, item(Material.CLOCK, "§eAktualisieren", "§7Lobby neu laden"));
             return;
         }
@@ -278,6 +283,7 @@ public final class LobbyMenu implements Listener {
         if (event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
 
         int slot = event.getRawSlot();
+        Game game = plugin.getGameManager().getActiveGame().orElse(null);
         if (slot == ADMIN_SLOT && player.hasPermission("manhunt.admin")) {
             plugin.getAdminMenu().open(player);
             return;
@@ -288,6 +294,11 @@ public final class LobbyMenu implements Listener {
                 Bukkit.dispatchCommand(player, "manhunt game ready");
                 Bukkit.getScheduler().runTask(plugin, () -> { if (player.isOnline()) open(player); });
             }
+            return;
+        }
+        if (slot == 49 && game == null && player.hasPermission("manhunt.admin")) {
+            player.closeInventory();
+            Bukkit.dispatchCommand(player, "manhunt game rematch");
             return;
         }
         if (slot == 51) {
