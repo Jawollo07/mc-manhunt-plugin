@@ -68,6 +68,20 @@ public final class ManHuntPlugin extends JavaPlugin {
             return;
         }
 
+        // A restart has no in-memory game session. Restore durable player
+        // snapshots before removing orphaned temporary arena worlds.
+        try {
+            int restored = playerSnapshotService.restoreOnlinePlayers(getServer().getOnlinePlayers());
+            if (restored > 0) getLogger().info("Restored " + restored + " player snapshot(s) after startup.");
+        } catch (RuntimeException exception) {
+            getLogger().severe("Could not restore all player snapshots after startup: " + exception.getMessage());
+        }
+        try {
+            mapManager.cleanupOrphanedWorkingCopies();
+        } catch (Exception exception) {
+            getLogger().warning("Could not clean up orphaned temporary arena worlds: " + exception.getMessage());
+        }
+
         gameLifecycleService = new GameLifecycleService(
                 gameManager, playerSnapshotService, playerManager, mapManager, statisticsRepository
         );
