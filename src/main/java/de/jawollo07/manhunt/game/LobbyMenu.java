@@ -312,7 +312,7 @@ public final class LobbyMenu implements Listener {
         }
         if (slot != ACTION_SLOT) return;
 
-        Game game = plugin.getGameManager().getActiveGame().orElse(null);
+        game = plugin.getGameManager().getActiveGame().orElse(null);
         if (game == null) {
             if (player.hasPermission("manhunt.admin")) plugin.getAdminMenu().open(player);
             else render(player, event.getView().getTopInventory());
