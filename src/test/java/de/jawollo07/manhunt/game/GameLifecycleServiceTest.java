@@ -14,6 +14,29 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GameLifecycleServiceTest {
     @Test
+    void finishingTheSameRoundTwiceRunsEndCallbackOnlyOnce() {
+        AtomicInteger ended = new AtomicInteger();
+        GameMode mode = new GameMode() {
+            @Override public String getId() { return "test"; }
+            @Override public String getDisplayName() { return "Test"; }
+            @Override public void onEnd(Game game) { ended.incrementAndGet(); }
+        };
+        GameManager manager = new GameManager();
+        Game game = manager.createGame(mode, new Arena("test", "Test Arena", "test_world"),
+                new GameSettings(2, 8, 5, 300, false, true));
+        GameLifecycleService lifecycle = new GameLifecycleService(manager);
+        Instant now = Instant.now();
+        GameResult result = new GameResult(game.getId(), GameOutcome.CANCELLED, List.of(),
+                List.of(), now, now, Duration.ZERO, "Test");
+
+        lifecycle.finish(result);
+        lifecycle.finish(result);
+
+        assertEquals(GameState.ENDING, game.getState());
+        assertEquals(1, ended.get());
+    }
+
+    @Test
     void randomTeamDistributionDefaultsToEnabledAndCanBeDisabled() {
         GameSettings defaults = new GameSettings(2, 8, 5, 300, false, true);
         GameSettings ordered = new GameSettings(2, 8, 5, 300, false, true, false);
