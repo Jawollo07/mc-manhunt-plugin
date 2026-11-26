@@ -97,9 +97,17 @@ public final class BuiltinGameModes {
             announce("Rundenregeln – " + String.join(" | ", details));
         }
 
+        /** Connected living players, used when assigning interactive targets. */
         protected List<UUID> activePlayers(Game game) {
             return game.getPlayers().stream()
                     .filter(p -> p.getStatus() == PlayerStatus.PLAYING)
+                    .map(GamePlayer::getUniqueId).toList();
+        }
+
+        /** Living players including temporary disconnects, used for victory checks. */
+        protected List<UUID> activeRoundPlayers(Game game) {
+            return game.getPlayers().stream()
+                    .filter(GamePlayer::isActiveForRound)
                     .map(GamePlayer::getUniqueId).toList();
         }
 
@@ -223,12 +231,12 @@ public final class BuiltinGameModes {
 
         protected long countActiveTeamMembers(Game game, Team team) {
             return team.getMembers().stream().filter(id ->
-                    game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).count();
+                    game.getPlayer(id).map(GamePlayer::isActiveForRound).orElse(false)).count();
         }
 
         protected List<UUID> activeTeamMembers(Game game, Team team) {
             return team.getMembers().stream().filter(id ->
-                    game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).toList();
+                    game.getPlayer(id).map(GamePlayer::isActiveForRound).orElse(false)).toList();
         }
 
         protected void apply(Player player, PotionEffectType type, int duration, int amplifier) {
@@ -293,7 +301,7 @@ public final class BuiltinGameModes {
                         "§eDein bisheriges Ziel ist ausgeschieden. Neues Ziel");
             }
 
-            List<UUID> alive = activePlayers(game);
+            List<UUID> alive = activeRoundPlayers(game);
             if (alive.size() <= 1) finish(game, GameOutcome.VICTORY, alive, "Letzter Assassine übrig");
         }
 
@@ -307,8 +315,18 @@ public final class BuiltinGameModes {
             for (UUID hunterId : orphanedHunters) {
                 setTarget(game, hunterId, inheritedTarget, "§eDein Ziel hat die Runde verlassen. Neues Ziel");
             }
-            List<UUID> alive = activePlayers(game);
+            List<UUID> alive = activeRoundPlayers(game);
             if (alive.size() <= 1) finish(game, GameOutcome.VICTORY, alive, "Letzter Assassine übrig");
+        }
+
+        @Override public void onPlayerJoin(Game game, GamePlayer player) {
+            if (player.getStatus() != PlayerStatus.PLAYING) return;
+            UUID target = targets.get(player.getUniqueId());
+            if (target == null) {
+                setTarget(game, player.getUniqueId(), null, "§aDu bist zurück! Neues Ziel");
+            } else {
+                sendTarget(player.getUniqueId(), target, "§aWillkommen zurück! Dein Ziel");
+            }
         }
 
         private void setTarget(Game game, UUID hunterId, UUID preferredTarget, String message) {
@@ -325,15 +343,18 @@ public final class BuiltinGameModes {
                 return;
             }
             targets.put(hunterId, target);
-            UUID assignedTarget = target;
+            sendTarget(hunterId, target, message);
+        }
+
+        private void sendTarget(UUID hunterId, UUID assignedTarget, String message) {
             Player hunter = Bukkit.getPlayer(hunterId);
-            if (hunter != null) {
-                String name = java.util.Optional.ofNullable(Bukkit.getPlayer(assignedTarget))
-                        .map(Player::getName)
-                        .orElseGet(() -> java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(assignedTarget).getName())
-                                .orElse(assignedTarget.toString().substring(0, 8)));
-                hunter.sendMessage(message + ": §c" + name);
-            }
+            if (hunter == null || assignedTarget == null) return;
+            String name = java.util.Optional.ofNullable(Bukkit.getPlayer(assignedTarget))
+                    .map(Player::getName)
+                    .orElseGet(() -> java.util.Optional.ofNullable(Bukkit.getOfflinePlayer(assignedTarget).getName())
+                            .orElse(assignedTarget.toString().substring(0, 8)));
+            hunter.sendMessage(message + ": §c" + name);
+        }
         }
 
         @Override public void onTick(Game game, long elapsedSeconds) {
@@ -347,7 +368,7 @@ public final class BuiltinGameModes {
                 hunter.sendActionBar(LegacyComponentSerializer.legacySection()
                         .deserialize("§cDein Ziel: §e" + targetName));
             }
-            if (timedOut(game, elapsedSeconds)) finish(game, GameOutcome.TIMEOUT, activePlayers(game), "Zeitlimit erreicht");
+            if (timedOut(game, elapsedSeconds)) finish(game, GameOutcome.TIMEOUT, activeRoundPlayers(game), "Zeitlimit erreicht");
         }
     }
 
@@ -506,7 +527,7 @@ public final class BuiltinGameModes {
 
         private void checkVictory(Game game) {
             boolean bossAlive = game.getPlayer(bossId)
-                    .map(player -> player.getStatus() == PlayerStatus.PLAYING).orElse(false);
+                    .map(GamePlayer::isActiveForRound).orElse(false);
             List<UUID> livingHunters = activeTeamMembers(game, hunters);
             if (!bossAlive && livingHunters.isEmpty()) {
                 finish(game, GameOutcome.DRAW, List.of(), "Niemand ist mehr in der Runde");
@@ -592,8 +613,7 @@ public final class BuiltinGameModes {
 
         @Override public void onTick(Game game, long elapsedSeconds) {
             if (timedOut(game, elapsedSeconds)) {
-                List<UUID> winners = survivors.getMembers().stream().filter(id ->
-                        game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).toList();
+                List<UUID> winners = activeTeamMembers(game, survivors);
                 finish(game, GameOutcome.TIMEOUT, winners, "Überlebende haben das Zeitlimit erreicht");
             }
         }
