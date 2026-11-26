@@ -88,6 +88,11 @@ class GameManagerTest {
 
         assertFalse(manager.hasActiveGame());
         assertTrue(manager.getActiveGame().isEmpty());
+        GameManager.RematchData rematch = manager.getLastGame().orElseThrow();
+        assertEquals("assassin", rematch.modeId());
+        assertEquals("forest", rematch.arenaId());
+        assertEquals(List.of(first, second), rematch.players());
+        assertEquals(settings, rematch.settings());
     }
 
     @Test
