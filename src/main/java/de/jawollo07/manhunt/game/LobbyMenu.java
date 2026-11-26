@@ -156,8 +156,19 @@ public final class LobbyMenu implements Listener {
             inventory.setItem(ADMIN_SLOT, item(Material.COMMAND_BLOCK, "§cAdmin-Menü",
                     "§7Runde verwalten oder eine neue Runde vorbereiten."));
         }
+        inventory.setItem(46, item(game.isReady(viewer.getUniqueId()) ? Material.LIME_DYE : Material.GRAY_DYE,
+                game.isReady(viewer.getUniqueId()) ? "§a§lBereit" : "§e§lBereitschaft",
+                "§7Dein Status: " + (game.isReady(viewer.getUniqueId()) ? "§aBereit" : "§cNicht bereit"),
+                "§7Bereit: §f" + onlineReadyCount(game) + "§7/§f" + onlineCount,
+                plugin.getConfigManager().getBoolean("game.require-ready", false)
+                        ? "§eAlle Spieler müssen bereit sein." : "§8Bereitschaft ist optional."));
         inventory.setItem(47, item(Material.SHIELD, "§bTeamübersicht",
                 teamLore(game).toArray(String[]::new)));
+        inventory.setItem(51, item(Material.FILLED_MAP, "§eArena-Abstimmung",
+                "§7Deine Stimme: §f" + game.getArenaVote(viewer.getUniqueId()).orElse("Keine"),
+                "§7Stimmen: §f" + game.getArenaVoteCounts().values().stream().mapToLong(Long::longValue).sum(),
+                "§e/manhunt game vote <arena>",
+                "§8Du kannst deine Stimme jederzeit ändern."));
         inventory.setItem(REFRESH_SLOT, item(Material.CLOCK, "§eAktualisieren",
                 "§7Spielerliste und Status neu laden."));
     }
@@ -225,6 +236,13 @@ public final class LobbyMenu implements Listener {
         return lines;
     }
 
+    private int onlineReadyCount(Game game) {
+        return (int) game.getPlayers().stream().filter(participant -> {
+            Player online = Bukkit.getPlayer(participant.getUniqueId());
+            return online != null && online.isOnline() && game.isReady(participant.getUniqueId());
+        }).count();
+    }
+
     private String teamSummary(Game game) {
         return teamLore(game).stream().map(line -> line.replace("§7", "").replace("§f", ""))
                 .collect(java.util.stream.Collectors.joining(" | "));
@@ -262,6 +280,19 @@ public final class LobbyMenu implements Listener {
         int slot = event.getRawSlot();
         if (slot == ADMIN_SLOT && player.hasPermission("manhunt.admin")) {
             plugin.getAdminMenu().open(player);
+            return;
+        }
+        if (slot == 46) {
+            if (game != null && game.hasPlayer(player.getUniqueId())) {
+                player.closeInventory();
+                Bukkit.dispatchCommand(player, "manhunt game ready");
+                Bukkit.getScheduler().runTask(plugin, () -> { if (player.isOnline()) open(player); });
+            }
+            return;
+        }
+        if (slot == 51) {
+            player.sendMessage("§6[ManHunt] §7Stimme mit §e/manhunt game vote <arena> §7für eine Arena ab.");
+            player.sendMessage("§7Verfügbare Arenen siehst du mit §e/manhunt arenas§7.");
             return;
         }
         if (slot == REFRESH_SLOT) {
