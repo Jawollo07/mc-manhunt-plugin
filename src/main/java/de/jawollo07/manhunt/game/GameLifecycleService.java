@@ -260,6 +260,10 @@ public final class GameLifecycleService {
 
     public void beginReset() {
         Game game = requireGame();
+        if (game.getState() == GameState.RESETTING) return;
+        if (game.getState() != GameState.ENDING) {
+            throw new IllegalStateException("Only an ending game can begin reset");
+        }
         restoreOnlineParticipants(game);
         gameManager.beginReset();
     }
