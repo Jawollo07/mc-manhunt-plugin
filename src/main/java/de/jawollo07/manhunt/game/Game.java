@@ -25,6 +25,7 @@ public final class Game {
     private final Map<UUID, String> lobbyTeamPreferences = new LinkedHashMap<>();
     private final java.util.Set<UUID> readyPlayers = new java.util.LinkedHashSet<>();
     private final Map<UUID, String> arenaVotes = new LinkedHashMap<>();
+    private final Map<UUID, UUID> invitations = new LinkedHashMap<>();
     private final RoleManager roleManager = new RoleManager();
     private final TeamManager teamManager = new TeamManager();
 
@@ -90,6 +91,23 @@ public final class Game {
         }
         if (arenaId == null || arenaId.isBlank()) throw new IllegalArgumentException("Arena id must not be blank");
         arenaVotes.put(playerId, arenaId.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    public void invitePlayer(UUID inviterId, UUID invitedId) {
+        if (state != GameState.WAITING && state != GameState.LOBBY && state != GameState.COUNTDOWN) {
+            throw new IllegalStateException("Invitations are only available in the lobby");
+        }
+        if (!players.containsKey(Objects.requireNonNull(inviterId, "inviterId"))) {
+            throw new IllegalArgumentException("Inviter is not part of this game");
+        }
+        Objects.requireNonNull(invitedId, "invitedId");
+        if (players.containsKey(invitedId)) throw new IllegalArgumentException("Player is already in this game");
+        if (getAvailableSlots() <= 0) throw new IllegalStateException("Game is full");
+        invitations.put(invitedId, inviterId);
+    }
+
+    public boolean consumeInvitation(UUID playerId) {
+        return invitations.remove(Objects.requireNonNull(playerId, "playerId")) != null;
     }
 
     public Optional<String> getArenaVote(UUID playerId) {
@@ -197,6 +215,7 @@ public final class Game {
         lobbyTeamPreferences.remove(playerId);
         readyPlayers.remove(playerId);
         arenaVotes.remove(playerId);
+        invitations.entrySet().removeIf(entry -> entry.getKey().equals(playerId) || entry.getValue().equals(playerId));
         if (removed != null) {
             roleManager.remove(playerId);
             teamManager.removePlayer(playerId);
