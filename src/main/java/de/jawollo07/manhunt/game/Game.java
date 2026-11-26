@@ -18,11 +18,13 @@ import java.util.UUID;
 public final class Game {
     private final UUID id;
     private final Instant createdAt;
-    private final GameMode mode;
-    private final Arena arena;
+    private GameMode mode;
+    private Arena arena;
     private final GameSettings settings;
     private final Map<UUID, GamePlayer> players = new LinkedHashMap<>();
     private final Map<UUID, String> lobbyTeamPreferences = new LinkedHashMap<>();
+    private final java.util.Set<UUID> readyPlayers = new java.util.LinkedHashSet<>();
+    private final Map<UUID, String> arenaVotes = new LinkedHashMap<>();
     private final RoleManager roleManager = new RoleManager();
     private final TeamManager teamManager = new TeamManager();
 
@@ -45,6 +47,68 @@ public final class Game {
     public Instant getCreatedAt() { return createdAt; }
     public GameMode getMode() { return mode; }
     public Arena getArena() { return arena; }
+
+    public void setArena(Arena arena) {
+        if (state != GameState.WAITING && state != GameState.LOBBY && state != GameState.COUNTDOWN) {
+            throw new IllegalStateException("Arena can only be changed before the game starts");
+        }
+        this.arena = Objects.requireNonNull(arena, "arena");
+    }
+
+    public boolean isReady(UUID playerId) { return readyPlayers.contains(playerId); }
+    public int getReadyCount() { return readyPlayers.size(); }
+    public boolean toggleReady(UUID playerId) {
+        if (state != GameState.WAITING && state != GameState.LOBBY && state != GameState.COUNTDOWN) {
+            throw new IllegalStateException("Readiness can only be changed in the lobby");
+        }
+        if (!players.containsKey(Objects.requireNonNull(playerId, "playerId"))) {
+            throw new IllegalArgumentException("Player is not part of this game");
+        }
+        if (!readyPlayers.remove(playerId)) {
+            readyPlayers.add(playerId);
+            return true;
+        }
+        return false;
+    }
+
+    public boolean areAllPlayersReady(java.util.function.Predicate<UUID> online) {
+        boolean foundOnline = false;
+        for (GamePlayer participant : players.values()) {
+            if (!online.test(participant.getUniqueId())) continue;
+            foundOnline = true;
+            if (!readyPlayers.contains(participant.getUniqueId())) return false;
+        }
+        return foundOnline;
+    }
+
+    public void castArenaVote(UUID playerId, String arenaId) {
+        if (state != GameState.WAITING && state != GameState.LOBBY && state != GameState.COUNTDOWN) {
+            throw new IllegalStateException("Arena voting is only available in the lobby");
+        }
+        if (!players.containsKey(Objects.requireNonNull(playerId, "playerId"))) {
+            throw new IllegalArgumentException("Player is not part of this game");
+        }
+        if (arenaId == null || arenaId.isBlank()) throw new IllegalArgumentException("Arena id must not be blank");
+        arenaVotes.put(playerId, arenaId.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    public Optional<String> getArenaVote(UUID playerId) {
+        return Optional.ofNullable(arenaVotes.get(playerId));
+    }
+
+    public Map<String, Long> getArenaVoteCounts() {
+        Map<String, Long> counts = new java.util.TreeMap<>();
+        arenaVotes.values().forEach(id -> counts.merge(id, 1L, Long::sum));
+        return Collections.unmodifiableMap(counts);
+    }
+
+    public Optional<String> getWinningArenaVote() {
+        return arenaVotes.values().stream().collect(java.util.stream.Collectors.groupingBy(
+                value -> value, java.util.stream.Collectors.counting())).entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed()
+                        .thenComparing(Map.Entry.comparingByKey()))
+                .map(Map.Entry::getKey).findFirst();
+    }
     public GameSettings getSettings() { return settings; }
     public RoleManager getRoleManager() { return roleManager; }
     public TeamManager getTeamManager() { return teamManager; }
@@ -131,6 +195,8 @@ public final class Game {
         Objects.requireNonNull(playerId, "playerId");
         GamePlayer removed = players.remove(playerId);
         lobbyTeamPreferences.remove(playerId);
+        readyPlayers.remove(playerId);
+        arenaVotes.remove(playerId);
         if (removed != null) {
             roleManager.remove(playerId);
             teamManager.removePlayer(playerId);
