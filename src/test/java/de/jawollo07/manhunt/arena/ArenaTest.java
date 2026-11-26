@@ -75,6 +75,18 @@ class ArenaTest {
     }
 
     @Test
+    void storesPerArenaDisconnectGraceAndPreservesItWhenDuplicated() {
+        Arena arena = new Arena("forest", "Forest", "map")
+                .withModeSetting("general", "disconnect_grace_seconds", "120");
+
+        assertEquals(120, arena.modeIntSetting("general", "disconnect_grace_seconds", 60));
+        assertEquals("120", arena.copyAs("forest_copy", "Forest copy")
+                .modeSetting("general", "disconnect_grace_seconds", "60"));
+        assertEquals(60, new Arena("default", "Default", "map")
+                .modeIntSetting("general", "disconnect_grace_seconds", 60));
+    }
+
+    @Test
     void rejectsInvalidSpawnPointKeysAndNonFiniteCoordinates() {
         assertThrows(IllegalArgumentException.class,
                 () -> new Arena("forest", "Forest", "map")
