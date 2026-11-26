@@ -87,4 +87,17 @@ class GameInstanceIsolationTest {
         assertEquals(1L, game.getArenaVoteCounts().get("desert"));
     }
 
+    @Test
+    void invitationCanOnlyBeAcceptedByTheInvitedPlayerAndIsConsumedOnce() {
+        Game game = newGame();
+        UUID inviter = UUID.randomUUID();
+        UUID invited = UUID.randomUUID();
+        game.addPlayer(new GamePlayer(inviter));
+
+        game.invitePlayer(inviter, invited);
+        assertTrue(game.consumeInvitation(invited));
+        assertFalse(game.consumeInvitation(invited));
+        assertThrows(IllegalArgumentException.class, () -> game.invitePlayer(UUID.randomUUID(), invited));
+    }
+
 }
