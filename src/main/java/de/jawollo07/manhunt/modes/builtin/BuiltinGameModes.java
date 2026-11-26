@@ -381,7 +381,6 @@ public final class BuiltinGameModes {
                             .orElse(assignedTarget.toString().substring(0, 8)));
             hunter.sendMessage(message + ": §c" + name);
         }
-        }
 
         @Override public void onTick(Game game, long elapsedSeconds) {
             for (Map.Entry<UUID, UUID> assignment : targets.entrySet()) {
@@ -483,8 +482,7 @@ public final class BuiltinGameModes {
                 }
             }
             if (timedOut(game, elapsedSeconds)) {
-                List<UUID> winners = survivors.getMembers().stream()
-                        .filter(id -> game.getPlayer(id).map(p -> p.getStatus() == PlayerStatus.PLAYING).orElse(false)).toList();
+                List<UUID> winners = activeTeamMembers(game, survivors);
                 finish(game, GameOutcome.TIMEOUT, winners, "Überlebende haben das Zeitlimit überstanden");
             }
         }
