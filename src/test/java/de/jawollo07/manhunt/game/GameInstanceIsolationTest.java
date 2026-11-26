@@ -49,4 +49,42 @@ class GameInstanceIsolationTest {
         assertTrue(game.getTeamManager().getTeamOf(player).isEmpty());
         assertTrue(game.removePlayer(player).isEmpty());
     }
+    @Test
+    void tracksLobbyReadinessOnlyForRegisteredPlayers() {
+        Game game = newGame();
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        game.addPlayer(new GamePlayer(first));
+        game.addPlayer(new GamePlayer(second));
+
+        assertFalse(game.areAllPlayersReady(id -> true));
+        assertTrue(game.toggleReady(first));
+        assertFalse(game.areAllPlayersReady(id -> true));
+        assertTrue(game.toggleReady(second));
+        assertTrue(game.areAllPlayersReady(id -> true));
+        assertFalse(game.toggleReady(first));
+        assertFalse(game.areAllPlayersReady(id -> true));
+        assertThrows(IllegalArgumentException.class, () -> game.toggleReady(UUID.randomUUID()));
+    }
+
+    @Test
+    void storesAndCountsArenaVotesAndRemovesVotesWhenPlayerLeaves() {
+        Game game = newGame();
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        game.addPlayer(new GamePlayer(first));
+        game.addPlayer(new GamePlayer(second));
+
+        game.castArenaVote(first, "desert");
+        game.castArenaVote(second, "forest");
+        assertEquals(1L, game.getArenaVoteCounts().get("desert"));
+        assertEquals(1L, game.getArenaVoteCounts().get("forest"));
+        assertEquals("desert", game.getWinningArenaVote().orElseThrow());
+
+        game.castArenaVote(second, "desert");
+        assertEquals("desert", game.getWinningArenaVote().orElseThrow());
+        game.removePlayer(first);
+        assertEquals(1L, game.getArenaVoteCounts().get("desert"));
+    }
+
 }
