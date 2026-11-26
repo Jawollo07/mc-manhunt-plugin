@@ -143,25 +143,39 @@ public final class BuiltinGameModes {
             if (ended || game.getState() != GameState.RUNNING) return;
             ended = true;
             announce("Runde beendet: " + reason);
+            String winnerNames = winners.stream()
+                    .map(id -> {
+                        String name = Bukkit.getOfflinePlayer(id).getName();
+                        return name == null ? id.toString().substring(0, 8) : name;
+                    })
+                    .collect(java.util.stream.Collectors.joining("§7, §e"));
             if (winners.isEmpty()) {
                 announce("Es gibt keinen Gewinner.");
             } else {
-                String winnerNames = winners.stream()
-                        .map(id -> {
-                            String name = Bukkit.getOfflinePlayer(id).getName();
-                            return name == null ? id.toString().substring(0, 8) : name;
-                        })
-                        .collect(java.util.stream.Collectors.joining("§7, §e"));
                 announce("Gewinner: §e" + winnerNames);
             }
             for (GamePlayer participant : game.getPlayers()) {
                 Player online = Bukkit.getPlayer(participant.getUniqueId());
                 if (online == null || !online.isOnline()) continue;
+                boolean winner = winners.contains(participant.getUniqueId());
+                String title = switch (outcome) {
+                    case DRAW -> "§eUnentschieden";
+                    case CANCELLED, ABORTED -> "§cRunde beendet";
+                    case VICTORY, TIMEOUT -> winner ? "§aSieg!" : "§cNiederlage";
+                };
+                String subtitle = winners.isEmpty() ? reason
+                        : winner ? "§f" + reason : "§7Gewinner: §f" + winnerNames;
+                online.sendTitle(title, subtitle, 10, 100, 20);
+                online.sendMessage("§6§lRundenergebnis");
+                online.sendMessage("§7Modus: §f" + getDisplayName() + " §8| §7Dauer: §f"
+                        + formatDuration(Duration.between(startedAt == null ? Instant.now() : startedAt, Instant.now())));
+                online.sendMessage("§7Ergebnis: " + title + " §8— §f" + reason);
+                online.sendMessage(winners.isEmpty() ? "§7Es gibt keinen Gewinner."
+                        : "§7Gewinner: §e" + winnerNames);
                 online.playSound(online.getLocation(),
-                        winners.contains(participant.getUniqueId())
-                                ? org.bukkit.Sound.ENTITY_PLAYER_LEVELUP
+                        winner ? org.bukkit.Sound.ENTITY_PLAYER_LEVELUP
                                 : org.bukkit.Sound.BLOCK_NOTE_BLOCK_BASS,
-                        0.9f, winners.contains(participant.getUniqueId()) ? 1.2f : 0.8f);
+                        0.9f, winner ? 1.2f : 0.8f);
             }
             // Death-triggered victories must be finalized after Bukkit has completed
             // the death/respawn sequence; restoring a snapshot inside PlayerDeathEvent
@@ -176,11 +190,32 @@ public final class BuiltinGameModes {
                 try {
                     plugin.getGameLifecycleService().finish(result);
                     plugin.getGameLifecycleService().beginReset();
-                    plugin.getGameLifecycleService().completeReset();
+                    long displaySeconds = Math.max(0, Math.min(60,
+                            plugin.getConfig().getLong("game.result-display-seconds", 8)));
+                    Runnable reset = () -> {
+                        try {
+                            if (plugin.getGameManager().getActiveGame().orElse(null) == game
+                                    && game.getState() == GameState.RESETTING) {
+                                plugin.getGameLifecycleService().completeReset();
+                            }
+                        } catch (RuntimeException cleanupFailure) {
+                            plugin.getLogger().severe("Could not reset " + getId() + " game: "
+                                    + cleanupFailure.getMessage());
+                        }
+                    };
+                    if (displaySeconds == 0) reset.run();
+                    else plugin.getServer().getScheduler().runTaskLater(plugin, reset, displaySeconds * 20L);
                 } catch (RuntimeException exception) {
                     plugin.getLogger().severe("Could not finish " + getId() + " game: " + exception.getMessage());
                 }
             });
+        }
+
+        private String formatDuration(Duration duration) {
+            long seconds = Math.max(0, duration.getSeconds());
+            long minutes = seconds / 60;
+            long remainder = seconds % 60;
+            return minutes > 0 ? minutes + " Min. " + remainder + " Sek." : remainder + " Sek.";
         }
 
         protected boolean timedOut(Game game, long elapsedSeconds) {
