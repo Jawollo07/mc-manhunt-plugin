@@ -58,8 +58,23 @@ public final class BuiltinGameModes {
 
         @Override public void onStart(Game game) {
             startedAt = Instant.now();
-            for (GamePlayer participant : game.getPlayers()) participant.setStatus(PlayerStatus.PLAYING);
+            for (GamePlayer participant : game.getPlayers()) {
+                if (participant.getStatus() != PlayerStatus.DISCONNECTED) {
+                    participant.setStatus(PlayerStatus.PLAYING);
+                }
+            }
             announceRoundSettings(game);
+        }
+
+        @Override public void onPlayerJoin(Game game, GamePlayer participant) {
+            Player player = Bukkit.getPlayer(participant.getUniqueId());
+            if (player == null) return;
+            if (participant.isEliminated()) {
+                player.sendMessage("§7Du bist ausgeschieden. Du kannst die laufende Runde als Zuschauer verfolgen.");
+                return;
+            }
+            String role = game.getRoleManager().getRoleId(participant.getUniqueId()).orElse("Teilnehmer");
+            player.sendMessage("§aWillkommen zurück! §7Deine Rolle: §e" + role);
         }
 
         private void announceRoundSettings(Game game) {
@@ -320,6 +335,7 @@ public final class BuiltinGameModes {
         }
 
         @Override public void onPlayerJoin(Game game, GamePlayer player) {
+            super.onPlayerJoin(game, player);
             if (player.getStatus() != PlayerStatus.PLAYING) return;
             UUID target = targets.get(player.getUniqueId());
             if (target == null) {
@@ -593,6 +609,19 @@ public final class BuiltinGameModes {
                 }
             }
             checkTeams(game);
+        }
+
+        @Override public void onPlayerJoin(Game game, GamePlayer participant) {
+            super.onPlayerJoin(game, participant);
+            if (participant.getStatus() != PlayerStatus.PLAYING) return;
+            if (infected.getMembers().contains(participant.getUniqueId())) {
+                Player player = Bukkit.getPlayer(participant.getUniqueId());
+                apply(player, PotionEffectType.SPEED, 20 * 60 * 10, 0);
+                if (player != null) player.sendMessage("§2Du bist infiziert. Finde die Überlebenden!");
+            } else {
+                Player player = Bukkit.getPlayer(participant.getUniqueId());
+                if (player != null) player.sendMessage("§bÜberlebe bis zum Zeitlimit oder entkomme!");
+            }
         }
 
         @Override public void onPlayerQuit(Game game, GamePlayer quitter) {
