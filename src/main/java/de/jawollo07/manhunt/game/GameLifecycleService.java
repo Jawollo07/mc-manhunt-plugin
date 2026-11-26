@@ -225,6 +225,7 @@ public final class GameLifecycleService {
                 () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
         );
         if (participant.isConnected()) return;
+        expireDisconnectedParticipant(game, participant, java.time.Instant.now());
         participant.reconnect();
 
         // Re-enter the disposable arena instead of restoring the pre-game
@@ -249,8 +250,9 @@ public final class GameLifecycleService {
         GamePlayer player = game.getPlayer(playerId).orElseThrow(
                 () -> new IllegalArgumentException("Player is not part of this game: " + playerId)
         );
+        // Keep the participant alive during the arena-specific grace period.
+        // Mode callbacks run only if the player fails to return in time.
         player.disconnect();
-        game.getMode().onPlayerQuit(game, player);
     }
 
     public void playerDied(UUID playerId, UUID killerId) {
@@ -270,8 +272,32 @@ public final class GameLifecycleService {
         }
         Game game = requireGame();
         if (game.getState() == GameState.RUNNING) {
-            game.getMode().onTick(game, elapsedSeconds);
+            expireDisconnectedParticipants(game, java.time.Instant.now());
+            if (game.getState() == GameState.RUNNING) {
+                game.getMode().onTick(game, elapsedSeconds);
+            }
         }
+    }
+
+    private void expireDisconnectedParticipants(Game game, java.time.Instant now) {
+        int graceSeconds = game.getArena().modeIntSetting("general", "disconnect_grace_seconds", 60);
+        if (graceSeconds <= 0) return;
+        for (GamePlayer participant : game.getPlayers()) {
+            if (!participant.hasExceededDisconnectGrace(java.time.Duration.ofSeconds(graceSeconds), now)) continue;
+            if (expireDisconnectedParticipant(game, participant, now)
+                    && game.getState() != GameState.RUNNING) return;
+        }
+    }
+
+    private boolean expireDisconnectedParticipant(Game game, GamePlayer participant, java.time.Instant now) {
+        int graceSeconds = game.getArena().modeIntSetting("general", "disconnect_grace_seconds", 60);
+        if (graceSeconds <= 0
+                || !participant.hasExceededDisconnectGrace(java.time.Duration.ofSeconds(graceSeconds), now)) {
+            return false;
+        }
+        if (!participant.expireDisconnect()) return false;
+        game.getMode().onPlayerQuit(game, participant);
+        return true;
     }
 
     public void beginReset() {
