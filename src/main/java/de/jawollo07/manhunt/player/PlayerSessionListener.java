@@ -40,13 +40,24 @@ public final class PlayerSessionListener implements Listener {
         if (game != null && game.hasPlayer(player.getUniqueId())
                 && game.getState() != GameState.ENDING
                 && game.getState() != GameState.RESETTING) {
-            lifecycleService.playerJoined(player.getUniqueId());
+            try {
+                lifecycleService.playerJoined(player.getUniqueId());
+            } catch (RuntimeException exception) {
+                org.bukkit.Bukkit.getLogger().severe("Could not restore ManHunt session for "
+                        + player.getName() + ": " + exception.getMessage());
+                snapshotService.restore(player);
+            }
             return;
         }
 
         // A player who disconnected during a game may reconnect after the
         // game ended. Their original pre-game state must still be restored.
-        snapshotService.restore(player);
+        try {
+            snapshotService.restore(player);
+        } catch (RuntimeException exception) {
+            org.bukkit.Bukkit.getLogger().severe("Could not restore player snapshot for "
+                    + player.getName() + ": " + exception.getMessage());
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -56,17 +67,22 @@ public final class PlayerSessionListener implements Listener {
         if (game == null || !game.hasPlayer(player.getUniqueId())) return;
         if (game.getState() == GameState.ENDING || game.getState() == GameState.RESETTING) return;
 
-        lifecycleService.playerQuit(player.getUniqueId());
-
-        // Lobby disconnects should free the slot immediately. Keeping an
-        // offline lobby member would allow the countdown to start with fewer
-        // actually available players than the configured minimum.
+        // Lobby departures are roster changes, not mode events. Calling a
+        // mode callback here can access teams that do not exist until prepare().
         if (game.getState() == GameState.WAITING || game.getState() == GameState.LOBBY
                 || game.getState() == GameState.COUNTDOWN) {
             gameManager.removePlayer(player.getUniqueId());
             org.bukkit.Bukkit.broadcastMessage("§e[ManHunt] §7" + player.getName()
                     + " hat die Lobby verlassen. §f" + game.getPlayerCount() + "/"
                     + game.getSettings().maxPlayers() + " §7Spieler.");
+            return;
+        }
+
+        try {
+            lifecycleService.playerQuit(player.getUniqueId());
+        } catch (RuntimeException exception) {
+            org.bukkit.Bukkit.getLogger().severe("Could not process ManHunt disconnect for "
+                    + player.getName() + ": " + exception.getMessage());
         }
     }
 }
