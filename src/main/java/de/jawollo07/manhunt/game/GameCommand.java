@@ -290,6 +290,9 @@ public final class GameCommand implements CommandExecutor, TabCompleter {
         Player player = requirePlayer(sender);
         requireArgs(args, 3, "Verwendung: /manhunt game vote <arena>");
         Game game = requireGame();
+        if (!plugin.getConfigManager().getBoolean("game.arena-voting", true)) {
+            throw new IllegalStateException("Arena-Abstimmungen sind deaktiviert.");
+        }
         Arena arena = plugin.getArenaService().find(args[2]).orElseThrow(
                 () -> new IllegalArgumentException("Arena nicht gefunden: " + args[2]));
         if (!arena.supportsMode(game.getMode().getId())) {
