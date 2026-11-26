@@ -57,4 +57,13 @@ public final class GamePlayer {
     public boolean isConnected() {
         return status != PlayerStatus.DISCONNECTED;
     }
+
+    /**
+     * Whether this participant is still alive in the current round. A short
+     * disconnect does not count as an elimination; the saved status decides.
+     */
+    public boolean isActiveForRound() {
+        return status == PlayerStatus.PLAYING
+                || (status == PlayerStatus.DISCONNECTED && statusBeforeDisconnect == PlayerStatus.PLAYING);
+    }
 }
