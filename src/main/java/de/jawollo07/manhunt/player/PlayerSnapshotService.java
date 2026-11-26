@@ -64,6 +64,28 @@ public final class PlayerSnapshotService {
         return true;
     }
 
+    /**
+     * Restores snapshots for players already online when the plugin enables.
+     * Offline snapshots remain durable and are restored on their next join.
+     */
+    public int restoreOnlinePlayers(Iterable<? extends Player> players) {
+        int restored = 0;
+        RuntimeException failure = null;
+        for (Player player : players) {
+            if (player == null || !hasSnapshot(player.getUniqueId())) continue;
+            try {
+                if (restore(player)) restored++;
+            } catch (RuntimeException exception) {
+                if (failure == null) {
+                    failure = new IllegalStateException("One or more online player snapshots could not be restored");
+                }
+                failure.addSuppressed(exception);
+            }
+        }
+        if (failure != null) throw failure;
+        return restored;
+    }
+
     public int size() {
         return snapshots.size();
     }
