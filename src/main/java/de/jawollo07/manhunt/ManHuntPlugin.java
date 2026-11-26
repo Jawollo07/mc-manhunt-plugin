@@ -8,6 +8,7 @@ import de.jawollo07.manhunt.game.GameLifecycleService;
 import de.jawollo07.manhunt.game.GameManager;
 import de.jawollo07.manhunt.game.GameHudService;
 import de.jawollo07.manhunt.game.LobbyMenu;
+import de.jawollo07.manhunt.game.PlayerOverviewMenu;
 import de.jawollo07.manhunt.map.MapManager;
 import de.jawollo07.manhunt.modes.GameModeFactory;
 import de.jawollo07.manhunt.modes.GameModeRegistry;
@@ -40,6 +41,7 @@ public final class ManHuntPlugin extends JavaPlugin {
     private LobbyMenu lobbyMenu;
     private AdminMenu adminMenu;
     private ArenaManagementMenu arenaManagementMenu;
+    private PlayerOverviewMenu playerOverviewMenu;
 
     @Override
     public void onEnable() {
@@ -116,6 +118,9 @@ public final class ManHuntPlugin extends JavaPlugin {
         lobbyMenu = new LobbyMenu(this);
         getServer().getPluginManager().registerEvents(lobbyMenu, this);
 
+        playerOverviewMenu = new PlayerOverviewMenu(this);
+        getServer().getPluginManager().registerEvents(playerOverviewMenu, this);
+
         PluginCommand command = getCommand("manhunt");
         if (command == null) {
             getLogger().severe("The /manhunt command is missing from plugin.yml");
@@ -177,4 +182,5 @@ public final class ManHuntPlugin extends JavaPlugin {
     public LobbyMenu getLobbyMenu() { return lobbyMenu; }
     public AdminMenu getAdminMenu() { return adminMenu; }
     public ArenaManagementMenu getArenaManagementMenu() { return arenaManagementMenu; }
+    public PlayerOverviewMenu getPlayerOverviewMenu() { return playerOverviewMenu; }
 }
