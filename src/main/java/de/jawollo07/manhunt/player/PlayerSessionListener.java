@@ -43,9 +43,11 @@ public final class PlayerSessionListener implements Listener {
             try {
                 lifecycleService.playerJoined(player.getUniqueId());
             } catch (RuntimeException exception) {
-                org.bukkit.Bukkit.getLogger().severe("Could not restore ManHunt session for "
+                // Keep the in-game snapshot intact. Restoring it here would
+                // teleport the player out of the active round and overwrite
+                // the arena state while the reconnect is being diagnosed.
+                org.bukkit.Bukkit.getLogger().severe("Could not resume ManHunt session for "
                         + player.getName() + ": " + exception.getMessage());
-                snapshotService.restore(player);
             }
             return;
         }
