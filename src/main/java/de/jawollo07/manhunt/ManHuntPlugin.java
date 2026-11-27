@@ -13,6 +13,7 @@ import de.jawollo07.manhunt.map.MapManager;
 import de.jawollo07.manhunt.modes.GameModeFactory;
 import de.jawollo07.manhunt.modes.GameModeRegistry;
 import de.jawollo07.manhunt.player.PlayerManager;
+import de.jawollo07.manhunt.game.RandomLootListener;
 import de.jawollo07.manhunt.player.PlayerSessionListener;
 import de.jawollo07.manhunt.player.PlayerSnapshotRepository;
 import de.jawollo07.manhunt.player.PlayerSnapshotService;
@@ -108,6 +109,8 @@ public final class ManHuntPlugin extends JavaPlugin {
                 new de.jawollo07.manhunt.modes.builtin.JuggernautAbilityListener(gameManager),
                 this
         );
+
+        getServer().getPluginManager().registerEvents(new RandomLootListener(this, gameManager), this);
 
         arenaManagementMenu = new ArenaManagementMenu(this);
         getServer().getPluginManager().registerEvents(arenaManagementMenu, this);
