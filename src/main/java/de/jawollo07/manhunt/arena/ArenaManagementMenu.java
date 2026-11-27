@@ -1035,7 +1035,7 @@ public final class ArenaManagementMenu implements Listener {
             if (!(event.getWhoClicked() instanceof Player editor)) return;
             if (event.getRawSlot() < 0) { event.setCancelled(true); return; }
             if (event.getRawSlot() >= event.getView().getTopInventory().getSize()) {
-                event.setCancelled(true);
+                event.setCancelled(event.isShiftClick());
                 return;
             }
             if (!allowed(editor)) return;
@@ -1301,7 +1301,9 @@ public final class ArenaManagementMenu implements Listener {
     public void onDrag(InventoryDragEvent event) {
         if (!(event.getView().getTopInventory().getHolder() instanceof MenuHolder holder)) return;
         if (holder.screen == Screen.LOADOUT_EDITOR) {
-            event.setCancelled(event.getRawSlots().stream().anyMatch(slot -> slot < 0 || slot > 40));
+            int topSize = event.getView().getTopInventory().getSize();
+            event.setCancelled(event.getRawSlots().stream()
+                    .anyMatch(slot -> slot >= 41 && slot < topSize));
             return;
         }
         event.setCancelled(true);
