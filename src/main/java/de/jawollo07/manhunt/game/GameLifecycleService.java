@@ -15,7 +15,6 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.Objects;
 import java.util.UUID;
