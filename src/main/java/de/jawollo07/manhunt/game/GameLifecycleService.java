@@ -178,20 +178,51 @@ public final class GameLifecycleService {
     private void applyTeamStartInventory(Game game, GamePlayer participant, Player player) {
         var inventory = player.getInventory();
         inventory.clear();
+
         Team team = game.getTeamManager().getTeamOf(participant.getUniqueId()).orElse(null);
-        if (team == null) return;
-        String teamKey = slug(team.getName());
-        String encoded = game.getArena().modeSetting("loadouts", teamKey, "");
-        if (encoded.isBlank()) return;
+        String role = game.getRoleManager().getRoleId(participant.getUniqueId()).orElse("");
+        String teamKey = team == null ? "" : slug(team.getName());
+        String roleKey = switch (role.toLowerCase(java.util.Locale.ROOT)) {
+            case "infected" -> "infected";
+            case "survivor" -> "survivors";
+            case "hitman" -> "hitmen";
+            case "juggernaut" -> "juggernaut";
+            case "hunter" -> "hunters";
+            case "assassin" -> "assassins";
+            default -> "";
+        };
+
+        String encoded = roleKey.isBlank() ? "" : game.getArena().modeSetting("loadouts", roleKey, "");
+        String selectedKey = roleKey;
+        if (encoded.isBlank() && !teamKey.isBlank()) {
+            encoded = game.getArena().modeSetting("loadouts", teamKey, "");
+            selectedKey = teamKey;
+        }
+        if (encoded.isBlank()) {
+            if (team == null) {
+                pluginLogger().warning("Kein Team für " + player.getName()
+                        + " beim Anwenden des Startinventars in Arena " + game.getArena().id()
+                        + " (Rolle: " + role + ")");
+            }
+            return;
+        }
+
         try {
             StartInventoryData loadout = StartInventoryData.decode(encoded);
             inventory.setContents(loadout.contents());
             inventory.setArmorContents(loadout.armor());
             inventory.setExtraContents(loadout.extra());
+            player.updateInventory();
+            pluginLogger().info("Startinventar '" + selectedKey + "' aus Arena "
+                    + game.getArena().id() + " an " + player.getName() + " ausgegeben.");
         } catch (IOException | IllegalArgumentException exception) {
-            throw new IllegalStateException("Startinventar für Team " + team.getName()
+            throw new IllegalStateException("Startinventar für Team " + selectedKey
                     + " in Arena " + game.getArena().id() + " ist beschädigt", exception);
         }
+    }
+
+    private java.util.logging.Logger pluginLogger() {
+        return org.bukkit.Bukkit.getLogger();
     }
 
     private Location resolveSpawn(Game game, GamePlayer participant, World world) {
