@@ -2,6 +2,7 @@ package de.jawollo07.manhunt.game;
 
 import de.jawollo07.manhunt.arena.Arena;
 import de.jawollo07.manhunt.arena.ArenaSpawnPoint;
+import de.jawollo07.manhunt.arena.StartInventoryData;
 import de.jawollo07.manhunt.arena.ArenaValidation;
 import de.jawollo07.manhunt.map.MapInstance;
 import de.jawollo07.manhunt.map.MapManager;
@@ -14,6 +15,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.Objects;
 import java.util.UUID;
@@ -137,6 +139,7 @@ public final class GameLifecycleService {
                             throw new IllegalStateException("Could not teleport player " + player.getUniqueId()
                                     + " into the arena");
                         }
+                        applyTeamStartInventory(game, participant, player);
                     });
                 }
             }
@@ -171,6 +174,25 @@ public final class GameLifecycleService {
                     .orElseGet(world::getSpawnLocation);
         }
         return resolveSpawn(game, participant, world);
+    }
+
+    private void applyTeamStartInventory(Game game, GamePlayer participant, Player player) {
+        Team team = game.getTeamManager().getTeamOf(participant.getUniqueId()).orElse(null);
+        if (team == null) return;
+        String teamKey = slug(team.getName());
+        String encoded = game.getArena().modeSetting("loadouts", teamKey, "");
+        if (encoded.isBlank()) return;
+        try {
+            StartInventoryData loadout = StartInventoryData.decode(encoded);
+            var inventory = player.getInventory();
+            inventory.clear();
+            inventory.setContents(loadout.contents());
+            inventory.setArmorContents(loadout.armor());
+            inventory.setExtraContents(loadout.extra());
+        } catch (IOException | IllegalArgumentException exception) {
+            throw new IllegalStateException("Startinventar für Team " + team.getName()
+                    + " in Arena " + game.getArena().id() + " ist beschädigt", exception);
+        }
     }
 
     private Location resolveSpawn(Game game, GamePlayer participant, World world) {
