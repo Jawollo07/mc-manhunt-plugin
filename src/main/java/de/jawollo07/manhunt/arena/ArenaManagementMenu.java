@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.bukkit.inventory.PlayerInventory;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** In-game arena and template administration. All actions are permission checked and non-destructive to templates. */
@@ -222,6 +223,10 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Nach Ablauf werden getrennte Spieler",
                     "§7automatisch als ausgeschieden gewertet.",
                     "§eKlicken: Nächsten Wert einstellen"));
+            inventory.setItem(27, item(Material.CHEST, "§6Team-Startinventare",
+                    "§7Lege für jedes Team eigene Startitems fest.",
+                    "§7Items, Rüstung und Schildhand werden gespeichert.",
+                    "§eKlicken zum Bearbeiten"));
             int slot = 28;
             for (ArenaSpawnPoint point : spawnPoints.subList(currentPage * 16, Math.min(currentPage * 16 + 16, spawnPoints.size()))) {
                 holder.spawnEntries.put(slot, point.name());
@@ -257,6 +262,102 @@ public final class ArenaManagementMenu implements Listener {
         } catch (SQLException | IllegalArgumentException exception) {
             player.sendMessage("§cArena-Details konnten nicht geladen werden: " + exception.getMessage());
             openArenaList(player);
+        }
+    }
+
+    private void openTeamLoadouts(Player player, String arenaId) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow();
+            MenuHolder holder = new MenuHolder(Screen.LOADOUT_TEAMS, arenaId, null);
+            Inventory inventory = inventory(holder, "ManHunt • Team-Loadouts");
+            String[][] teams = {
+                    {"assassins", "Assassinen", "DIAMOND_SWORD"},
+                    {"hitmen", "Hitmen", "IRON_SWORD"},
+                    {"survivors", "Überlebende", "SHIELD"},
+                    {"juggernaut", "Juggernaut", "NETHERITE_CHESTPLATE"},
+                    {"hunters", "Jäger", "BOW"},
+                    {"infected", "Infizierte", "ROTTEN_FLESH"}
+            };
+            int[] slots = {10, 11, 12, 14, 15, 16};
+            for (int i = 0; i < teams.length; i++) {
+                String key = teams[i][0];
+                boolean configured = !arena.modeSetting("loadouts", key, "").isBlank();
+                holder.entries.put(slots[i], key);
+                inventory.setItem(slots[i], item(Material.valueOf(teams[i][2]),
+                        (configured ? "§a" : "§e") + teams[i][1],
+                        "§7Startinventar: " + (configured ? "§aEingerichtet" : "§cStandard"),
+                        "§eKlicken zum Bearbeiten"));
+            }
+            inventory.setItem(4, item(Material.CHEST, "§6Startinventare pro Team",
+                    "§7Wähle ein Team aus und bearbeite",
+                    "§7dessen Items, Rüstung und Schildhand."));
+            inventory.setItem(45, item(Material.ARROW, "§eZurück zu den Arena-Details"));
+            inventory.setItem(49, item(Material.SUNFLOWER, "§eAktualisieren"));
+            inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
+            player.openInventory(inventory);
+        } catch (SQLException | IllegalArgumentException exception) {
+            player.sendMessage("§cTeam-Startinventare konnten nicht geladen werden: " + exception.getMessage());
+            openDetails(player, arenaId);
+        }
+    }
+
+    private void openLoadoutEditor(Player player, String arenaId, String teamKey) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow();
+            MenuHolder holder = new MenuHolder(Screen.LOADOUT_EDITOR, arenaId, teamKey);
+            Inventory inventory = inventory(holder, "Startinventar • " + teamKey);
+            String encoded = arena.modeSetting("loadouts", teamKey, "");
+            if (!encoded.isBlank()) {
+                StartInventoryData data = StartInventoryData.decode(encoded);
+                ItemStack[] contents = data.contents();
+                ItemStack[] armor = data.armor();
+                ItemStack[] extra = data.extra();
+                for (int i = 0; i < Math.min(36, contents.length); i++) inventory.setItem(i, contents[i]);
+                for (int i = 0; i < Math.min(4, armor.length); i++) inventory.setItem(36 + i, armor[i]);
+                if (extra.length > 0) inventory.setItem(40, extra[0]);
+            }
+            inventory.setItem(41, item(Material.IRON_HELMET, "§eRüstung",
+                    "§7Slots 36–39: Schuhe bis Helm"));
+            inventory.setItem(42, item(Material.SHIELD, "§eSchildhand",
+                    "§7Slot 40: Schildhand / Offhand"));
+            inventory.setItem(45, item(Material.LIME_CONCRETE, "§aStartinventar speichern",
+                    "§7Speichert alle belegten Slots dieses Teams."));
+            inventory.setItem(47, item(Material.BARRIER, "§cStartinventar zurücksetzen",
+                    "§7Entfernt die Team-Konfiguration."));
+            inventory.setItem(49, item(Material.ARROW, "§eZurück zur Team-Auswahl"));
+            inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
+            player.openInventory(inventory);
+        } catch (SQLException | IOException | IllegalArgumentException exception) {
+            player.sendMessage("§cStartinventar konnte nicht geladen werden: " + exception.getMessage());
+            openTeamLoadouts(player, arenaId);
+        }
+    }
+
+    private void saveLoadout(Player player, MenuHolder holder, boolean reset) {
+        try {
+            Arena arena = plugin.getArenaService().find(holder.arenaId).orElseThrow();
+            String encoded = "";
+            if (!reset) {
+                ItemStack[] contents = new ItemStack[36];
+                ItemStack[] armor = new ItemStack[4];
+                ItemStack[] extra = new ItemStack[1];
+                for (int i = 0; i < contents.length; i++) {
+                    ItemStack stack = holder.inventory.getItem(i);
+                    contents[i] = stack == null ? null : stack.clone();
+                }
+                for (int i = 0; i < armor.length; i++) {
+                    ItemStack stack = holder.inventory.getItem(36 + i);
+                    armor[i] = stack == null ? null : stack.clone();
+                }
+                ItemStack offhand = holder.inventory.getItem(40);
+                extra[0] = offhand == null ? null : offhand.clone();
+                encoded = new StartInventoryData(contents, armor, extra).encode();
+            }
+            plugin.getArenaService().save(arena.withModeSetting("loadouts", holder.secondaryId, encoded));
+            player.sendMessage(reset ? "§aStartinventar zurückgesetzt." : "§aTeam-Startinventar gespeichert.");
+            openTeamLoadouts(player, holder.arenaId);
+        } catch (SQLException | IOException | IllegalArgumentException exception) {
+            player.sendMessage("§cStartinventar konnte nicht gespeichert werden: " + exception.getMessage());
         }
     }
 
@@ -926,6 +1027,22 @@ public final class ArenaManagementMenu implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         if (!(event.getView().getTopInventory().getHolder() instanceof MenuHolder holder)) return;
+        if (holder.screen == Screen.LOADOUT_EDITOR) {
+            if (!(event.getWhoClicked() instanceof Player editor)
+                    || event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
+            if (!allowed(editor)) return;
+            int editorSlot = event.getRawSlot();
+            if (editorSlot <= 40) {
+                event.setCancelled(false);
+                return;
+            }
+            event.setCancelled(true);
+            if (editorSlot == 45) saveLoadout(editor, holder, false);
+            else if (editorSlot == 47) saveLoadout(editor, holder, true);
+            else if (editorSlot == 49) openTeamLoadouts(editor, holder.arenaId);
+            else if (editorSlot == 53) editor.closeInventory();
+            return;
+        }
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player)
                 || event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
@@ -1050,6 +1167,7 @@ public final class ArenaManagementMenu implements Listener {
                 return;
             }
             if (slot == 26) { cycleDisconnectGrace(player, holder.arenaId); return; }
+            if (slot == 27) { openTeamLoadouts(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String spawnName = holder.spawnActions.get(slot);
             if (spawnName != null) { setSpawn(player, holder.arenaId, spawnName); return; }
@@ -1088,6 +1206,12 @@ public final class ArenaManagementMenu implements Listener {
                     }
                 } else openConfirm(player, holder.arenaId, spawnName);
             }
+        } else if (holder.screen == Screen.LOADOUT_TEAMS) {
+            if (slot == 45) { openDetails(player, holder.arenaId); return; }
+            if (slot == 49) { openTeamLoadouts(player, holder.arenaId); return; }
+            if (slot == 53) { player.closeInventory(); return; }
+            String teamKey = holder.entries.get(slot);
+            if (teamKey != null) { openLoadoutEditor(player, holder.arenaId, teamKey); return; }
         } else if (holder.screen == Screen.CONFIRM) {
             if (slot == 11) deleteConfirmed(player, holder);
             else if (slot == 15) {
@@ -1166,7 +1290,12 @@ public final class ArenaManagementMenu implements Listener {
 
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
-        if (event.getView().getTopInventory().getHolder() instanceof MenuHolder) event.setCancelled(true);
+        if (!(event.getView().getTopInventory().getHolder() instanceof MenuHolder holder)) return;
+        if (holder.screen == Screen.LOADOUT_EDITOR) {
+            event.setCancelled(event.getRawSlots().stream().anyMatch(slot -> slot < 0 || slot > 40));
+            return;
+        }
+        event.setCancelled(true);
     }
 
     private boolean allowed(Player player) {
@@ -1200,7 +1329,7 @@ public final class ArenaManagementMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, MODE_SETUP, MODE_SETTINGS, REVIEW, DETAILS, CONFIRM }
+    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, MODE_SETUP, MODE_SETTINGS, REVIEW, DETAILS, LOADOUT_TEAMS, LOADOUT_EDITOR, CONFIRM }
     private enum InputAction { RENAME, CHANGE_TEMPLATE, DUPLICATE }
     private record PendingInput(String arenaId, InputAction action) { }
 
