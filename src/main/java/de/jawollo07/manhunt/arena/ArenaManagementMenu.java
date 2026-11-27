@@ -1032,10 +1032,11 @@ public final class ArenaManagementMenu implements Listener {
     public void onClick(InventoryClickEvent event) {
         if (!(event.getView().getTopInventory().getHolder() instanceof MenuHolder holder)) return;
         if (holder.screen == Screen.LOADOUT_EDITOR) {
+            event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof Player editor)) return;
-            if (event.getRawSlot() < 0) { event.setCancelled(true); return; }
+            if (event.getRawSlot() < 0) return;
             if (event.getRawSlot() >= event.getView().getTopInventory().getSize()) {
-                event.setCancelled(event.isShiftClick());
+                if (!event.isShiftClick()) event.setCancelled(false);
                 return;
             }
             if (!allowed(editor)) return;
