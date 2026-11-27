@@ -40,7 +40,7 @@ public record Arena(String id, String displayName, String worldName, Map<String,
                 throw new IllegalArgumentException("Invalid mode settings id: " + modeId);
             Map<String, String> normalized = new LinkedHashMap<>();
             Objects.requireNonNull(values, "mode setting values").forEach((key, value) -> {
-                if (key == null || !key.matches("[a-zA-Z0-9_-]{1,64}") || value == null || value.length() > 128)
+                if (key == null || !key.matches("[a-zA-Z0-9_-]{1,64}") || value == null || value.length() > 1_000_000)
                     throw new IllegalArgumentException("Invalid mode setting: " + key);
                 normalized.put(key.toLowerCase(java.util.Locale.ROOT), value);
             });
