@@ -218,6 +218,11 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Team-Spawns: §f" + spawnPoints.stream().filter(point -> point.name().startsWith("team:")).count(),
                     "§7Standard-Spawn: " + (arena.spawnPoint("default").isPresent() ? "§aGesetzt" : "§eNicht gesetzt"),
                     template.loaded() ? "§eVorlage ist geladen – vor Spielstart entladen." : "§aVorlage ist nicht geladen."));
+            inventory.setItem(25, item(arena.modeBooleanSetting("general", "random_loot_enabled", false) ? Material.CHEST : Material.BARREL,
+                    "§6Random Loot: " + (arena.modeBooleanSetting("general", "random_loot_enabled", false) ? "§aAktiviert" : "§cDeaktiviert"),
+                    "§7Truhen und andere Loot-Container erhalten",
+                    "§7bei ihrer ersten Öffnung zufällige Beute.",
+                    "§eKlicken zum Umschalten"));
             inventory.setItem(26, item(Material.CLOCK, "§eDisconnect-Kulanz ändern",
                     "§7Aktuell: §f" + settingValueLabel("disconnect_grace_seconds",
                             arena.modeSetting("general", "disconnect_grace_seconds", "60")),
@@ -877,6 +882,20 @@ public final class ArenaManagementMenu implements Listener {
         }
     }
 
+    private void toggleRandomLoot(Player player, String arenaId) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            boolean enabled = !arena.modeBooleanSetting("general", "random_loot_enabled", false);
+            plugin.getArenaService().save(arena.withModeSetting("general", "random_loot_enabled", Boolean.toString(enabled)));
+            player.sendMessage("§aRandom Loot wurde " + (enabled ? "§aaktiviert" : "§cdeaktiviert") + "§a.");
+            openDetails(player, arenaId);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cRandom Loot konnte nicht gespeichert werden: " + exception.getMessage());
+            openDetails(player, arenaId);
+        }
+    }
+
     private void cycleDisconnectGrace(Player player, String arenaId) {
         try {
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
@@ -1199,6 +1218,7 @@ public final class ArenaManagementMenu implements Listener {
                 }
                 return;
             }
+            if (slot == 25) { toggleRandomLoot(player, holder.arenaId); return; }
             if (slot == 26) { cycleDisconnectGrace(player, holder.arenaId); return; }
             if (slot == 27) { openTeamLoadouts(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
