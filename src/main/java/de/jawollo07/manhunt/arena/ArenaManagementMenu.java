@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import org.bukkit.inventory.PlayerInventory;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** In-game arena and template administration. All actions are permission checked and non-destructive to templates. */
@@ -583,8 +582,13 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Gespeicherte Team-Spawnpunkte: §f" + teamSpawns,
                     "§7Es werden nur benötigte Teams angezeigt.",
                     "§eKlicken für die Team-Einrichtung"));
-            inventory.setItem(32, item(Material.BOOK,
-                    "§e6. Abschlussprüfung",
+            inventory.setItem(32, item(Material.CHEST,
+                    "§a6. Team-Startinventare",
+                    "§7Lege Items, Rüstung und Schildhand",
+                    "§7für jedes Team separat fest.",
+                    "§eKlicken zur Konfiguration"));
+            inventory.setItem(34, item(Material.BOOK,
+                    "§e7. Abschlussprüfung",
                     "§7Prüft nur die für diese Arena freigegebenen Modi.",
                     "§7Zeigt fehlende Pflicht-Spawns und Hinweise.",
                     "§eKlicken für die vollständige Prüfung"));
@@ -1028,8 +1032,12 @@ public final class ArenaManagementMenu implements Listener {
     public void onClick(InventoryClickEvent event) {
         if (!(event.getView().getTopInventory().getHolder() instanceof MenuHolder holder)) return;
         if (holder.screen == Screen.LOADOUT_EDITOR) {
-            if (!(event.getWhoClicked() instanceof Player editor)
-                    || event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
+            if (!(event.getWhoClicked() instanceof Player editor)) return;
+            if (event.getRawSlot() < 0) { event.setCancelled(true); return; }
+            if (event.getRawSlot() >= event.getView().getTopInventory().getSize()) {
+                event.setCancelled(true);
+                return;
+            }
             if (!allowed(editor)) return;
             int editorSlot = event.getRawSlot();
             if (editorSlot <= 40) {
@@ -1107,7 +1115,8 @@ public final class ArenaManagementMenu implements Listener {
             if (slot == 14) { setSpawn(player, holder.arenaId, "default"); return; }
             if (slot == 16) { openModeSetup(player, holder.arenaId); return; }
             if (slot == 30) { openTeamSetup(player, holder.arenaId); return; }
-            if (slot == 32) { openSetupReview(player, holder.arenaId); return; }
+            if (slot == 32) { openTeamLoadouts(player, holder.arenaId); return; }
+            if (slot == 34) { openSetupReview(player, holder.arenaId); return; }
         } else if (holder.screen == Screen.TEAM_SETUP) {
             if (slot == 45) { openModeSetup(player, holder.arenaId); return; }
             if (slot == 31) { openSetupReview(player, holder.arenaId); return; }
