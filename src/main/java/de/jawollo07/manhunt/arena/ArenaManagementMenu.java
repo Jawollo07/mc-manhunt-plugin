@@ -13,6 +13,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
@@ -37,6 +38,7 @@ public final class ArenaManagementMenu implements Listener {
     private final Map<UUID, Location> editingReturnLocations = new ConcurrentHashMap<>();
     private final Map<UUID, String> editingTemplateIds = new ConcurrentHashMap<>();
     private final Map<UUID, String> setupArenaIds = new ConcurrentHashMap<>();
+    private final Map<UUID, StartInventoryData> loadoutEditorBackups = new ConcurrentHashMap<>();
 
     public ArenaManagementMenu(ManHuntPlugin plugin) {
         this.plugin = plugin;
@@ -325,11 +327,32 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Entfernt die Team-Konfiguration."));
             inventory.setItem(49, item(Material.ARROW, "§eZurück zur Team-Auswahl"));
             inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
+            loadoutEditorBackups.putIfAbsent(player.getUniqueId(), new StartInventoryData(
+                    player.getInventory().getContents(),
+                    player.getInventory().getArmorContents(),
+                    player.getInventory().getExtraContents()));
             player.openInventory(inventory);
         } catch (SQLException | IOException | IllegalArgumentException exception) {
             player.sendMessage("§cStartinventar konnte nicht geladen werden: " + exception.getMessage());
             openTeamLoadouts(player, arenaId);
         }
+    }
+
+    private void restoreLoadoutEditorBackup(Player player) {
+        StartInventoryData backup = loadoutEditorBackups.remove(player.getUniqueId());
+        if (backup == null) return;
+        var inventory = player.getInventory();
+        inventory.clear();
+        inventory.setContents(backup.contents());
+        inventory.setArmorContents(backup.armor());
+        inventory.setExtraContents(backup.extra());
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (!(event.getInventory().getHolder() instanceof MenuHolder holder)
+                || holder.screen != Screen.LOADOUT_EDITOR) return;
+        if (event.getPlayer() instanceof Player player) restoreLoadoutEditorBackup(player);
     }
 
     private void saveLoadout(Player player, MenuHolder holder, boolean reset) {
@@ -1286,6 +1309,7 @@ public final class ArenaManagementMenu implements Listener {
         UUID playerId = event.getPlayer().getUniqueId();
         editingReturnLocations.remove(playerId);
         setupArenaIds.remove(playerId);
+        loadoutEditorBackups.remove(playerId);
         String templateId = editingTemplateIds.remove(playerId);
         if (templateId == null) return;
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
