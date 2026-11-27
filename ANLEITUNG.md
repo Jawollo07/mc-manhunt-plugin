@@ -59,7 +59,7 @@ Der empfohlene Weg ist die geführte GUI:
 5. Arena-ID und Anzeigename festlegen, falls abgefragt.
 6. Der Assistent öffnet die neu angelegte Arena und führt durch die Einrichtung.
 
-Der Assistent besteht aus sechs Schritten:
+Der Assistent besteht aus sieben Schritten:
 
 ### Schritt 1 – Kartenvorlage auswählen
 
@@ -98,7 +98,21 @@ Benötigte Teams:
 
 Bei Hitman kann zusätzlich ein **Evakuierungspunkt** gesetzt werden. Er ist optional und wird nur benötigt, wenn die Evakuierung in den Hitman-Einstellungen aktiviert ist.
 
-### Schritt 6 – Abschlussprüfung
+### Schritt 6 – Team-Startinventare
+
+Für jedes Team kannst du ein eigenes Startinventar festlegen. Wähle das Team aus und bearbeite das Inventar direkt im geöffneten Menü:
+
+- Slots 1–36: normale Inventarplätze
+- Slots 37–40: Rüstung (Schuhe, Hose, Brustplatte, Helm)
+- Schildhand: zusätzlicher Slot für Offhand-Items
+
+Du kannst Items aus deinem eigenen Inventar in die freien Plätze ziehen oder zurücknehmen. Mit **Startinventar speichern** wird die Zusammenstellung für dieses Team und diese Arena gespeichert. **Startinventar zurücksetzen** entfernt die eigene Konfiguration für das Team.
+
+Verfügbare Teams sind Assassinen, Hitmen, Überlebende, Juggernaut, Jäger und Infizierte. Nicht verwendete Teams können leer bleiben. Beim Rundenstart erhalten Spieler die gespeicherte Zusammenstellung ihres zugewiesenen Teams. Modus-Fähigkeiten wie die Juggernaut-Fähigkeiten werden zusätzlich hinzugefügt.
+
+Die Inventare werden zusammen mit der Arena gespeichert und beim Duplizieren der Arena übernommen.
+
+### Schritt 7 – Abschlussprüfung
 
 Die Prüfung kontrolliert die Arena anhand der freigegebenen Modi. Sie zeigt fehlende Pflicht-Spawnpunkte, eine ungültige Vorlage und weitere Hinweise.
 
@@ -133,7 +147,7 @@ In der Verwaltung kannst du:
 - Anzeigenamen und Kartenvorlage ändern.
 - Spawnpunkte ansehen, setzen, teleportieren und entfernen.
 - Freigegebene Spielmodi ändern.
-- Modusbezogene Einstellungen anpassen.
+- Modusbezogene Einstellungen und Team-Startinventare anpassen.
 - Die Arena-Prüfung aufrufen.
 
 Eine Arena, die gerade von einer aktiven Runde verwendet wird, kann nicht gelöscht werden.
