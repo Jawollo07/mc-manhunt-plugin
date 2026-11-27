@@ -176,6 +176,8 @@ public final class GameLifecycleService {
     }
 
     private void applyTeamStartInventory(Game game, GamePlayer participant, Player player) {
+        var inventory = player.getInventory();
+        inventory.clear();
         Team team = game.getTeamManager().getTeamOf(participant.getUniqueId()).orElse(null);
         if (team == null) return;
         String teamKey = slug(team.getName());
@@ -183,8 +185,6 @@ public final class GameLifecycleService {
         if (encoded.isBlank()) return;
         try {
             StartInventoryData loadout = StartInventoryData.decode(encoded);
-            var inventory = player.getInventory();
-            inventory.clear();
             inventory.setContents(loadout.contents());
             inventory.setArmorContents(loadout.armor());
             inventory.setExtraContents(loadout.extra());
