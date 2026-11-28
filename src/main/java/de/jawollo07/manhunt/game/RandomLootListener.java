@@ -3,6 +3,7 @@ package de.jawollo07.manhunt.game;
 import de.jawollo07.manhunt.ManHuntPlugin;
 import org.bukkit.Material;
 import org.bukkit.block.Container;
+import org.bukkit.block.Chest;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -45,6 +46,16 @@ public final class RandomLootListener implements Listener {
         if (game == null || !game.isRunning()
                 || !game.getArena().modeBooleanSetting("general", "random_loot_enabled", false)) return;
         if (!(event.getInventoryHolder() instanceof Container)) return;
+        if (!(event.getInventoryHolder() instanceof Chest chest)) return;
+
+        // Keep only roughly one in five chests as randomized-loot chests.
+        // The decision is deterministic for this game and chest, so reopening
+        // or reloading a chunk never rerolls the selection.
+        var location = chest.getBlock().getLocation();
+        int selection = Math.floorMod(java.util.Objects.hash(
+                game.getId(), event.getWorld().getUID(),
+                location.getBlockX(), location.getBlockY(), location.getBlockZ()), 100);
+        if (selection >= 20) return;
 
         var mapInstance = game.getMapInstance().orElse(null);
         if (mapInstance == null || !mapInstance.worldName().equals(event.getWorld().getName())) return;
