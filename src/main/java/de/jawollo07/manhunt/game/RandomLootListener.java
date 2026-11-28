@@ -23,19 +23,6 @@ import java.util.concurrent.ThreadLocalRandom;
  * Ordinary worlds, mob drops and block drops are deliberately left untouched.
  */
 public final class RandomLootListener implements Listener {
-    private static final List<Material> LOOT_POOL = List.of(
-            Material.BREAD, Material.COOKED_BEEF, Material.COOKED_PORKCHOP, Material.BAKED_POTATO,
-            Material.CARROT, Material.GOLDEN_CARROT, Material.APPLE, Material.GOLDEN_APPLE,
-            Material.ARROW, Material.TIPPED_ARROW, Material.BOW, Material.CROSSBOW,
-            Material.IRON_INGOT, Material.GOLD_INGOT, Material.COPPER_INGOT, Material.EMERALD,
-            Material.LAPIS_LAZULI, Material.REDSTONE, Material.DIAMOND, Material.OBSIDIAN,
-            Material.ENDER_PEARL, Material.EXPERIENCE_BOTTLE, Material.TNT, Material.STRING,
-            Material.LEATHER, Material.FEATHER, Material.BONE, Material.GUNPOWDER,
-            Material.OAK_PLANKS, Material.COBBLESTONE, Material.TORCH, Material.CRAFTING_TABLE,
-            Material.IRON_PICKAXE, Material.IRON_AXE, Material.SHIELD, Material.COOKED_CHICKEN,
-            Material.SADDLE, Material.NAME_TAG, Material.BOOK, Material.COMPASS
-    );
-
     private final ManHuntPlugin plugin;
     private final GameManager gameManager;
     private UUID selectedWorldId;
@@ -88,13 +75,17 @@ public final class RandomLootListener implements Listener {
             return dx * dx + dy * dy + dz * dz < minDistanceSquared;
         })) return;
 
+        Set<Material> lootPool = RandomLootPool.parse(game.getArena().modeSetting("general", "random_loot_pool", ""));
+        if (lootPool.isEmpty()) return;
+
         randomizedChests.add(position);
         event.getLoot().clear();
         ThreadLocalRandom random = ThreadLocalRandom.current();
+        List<Material> materials = List.copyOf(lootPool);
         int rolls = random.nextInt(4, 9);
         List<ItemStack> generated = new ArrayList<>(rolls);
         for (int i = 0; i < rolls; i++) {
-            Material material = LOOT_POOL.get(random.nextInt(LOOT_POOL.size()));
+            Material material = materials.get(random.nextInt(materials.size()));
             int max = material.getMaxStackSize();
             int amount = max <= 1 ? 1 : random.nextInt(1, Math.min(max, 12) + 1);
             generated.add(new ItemStack(material, amount));
