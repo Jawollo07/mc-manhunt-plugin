@@ -218,12 +218,21 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Team-Spawns: §f" + spawnPoints.stream().filter(point -> point.name().startsWith("team:")).count(),
                     "§7Standard-Spawn: " + (arena.spawnPoint("default").isPresent() ? "§aGesetzt" : "§eNicht gesetzt"),
                     template.loaded() ? "§eVorlage ist geladen – vor Spielstart entladen." : "§aVorlage ist nicht geladen."));
+            inventory.setItem(24, item(Material.GOLD_INGOT, "§6Loot-Chance einstellen",
+                    "§7Aktuell: §f" + arena.modeSetting("general", "random_loot_chance", "20") + "%",
+                    "§7Wie viele geeignete Truhen zufälligen Loot erhalten.",
+                    "§eKlicken: Nächsten Wert einstellen"));
             inventory.setItem(25, item(arena.modeBooleanSetting("general", "random_loot_enabled", false) ? Material.CHEST : Material.BARREL,
                     "§6Random Loot: " + (arena.modeBooleanSetting("general", "random_loot_enabled", false) ? "§aAktiviert" : "§cDeaktiviert"),
-                    "§7Truhen und andere Loot-Container erhalten",
-                    "§7bei ihrer ersten Öffnung zufällige Beute.",
+                    "§7Truhen erhalten bei ihrer ersten Öffnung",
+                    "§7zufällige Beute, sofern Chance und Abstand passen.",
                     "§eKlicken zum Umschalten"));
-            inventory.setItem(26, item(Material.CLOCK, "§eDisconnect-Kulanz ändern",
+            inventory.setItem(26, item(Material.COMPASS, "§eMindestabstand der Loot-Truhen",
+                    "§7Aktuell: §f" + arena.modeSetting("general", "random_loot_min_distance", "20") + " Blöcke",
+                    "§7Abstand zur nächsten bereits ausgewählten",
+                    "§7Loot-Truhe (0 = kein Mindestabstand).",
+                    "§eKlicken: Nächsten Wert einstellen"));
+            inventory.setItem(27, item(Material.CLOCK, "§eDisconnect-Kulanz ändern",
                     "§7Aktuell: §f" + settingValueLabel("disconnect_grace_seconds",
                             arena.modeSetting("general", "disconnect_grace_seconds", "60")),
                     "§7Nach Ablauf werden getrennte Spieler",
@@ -896,6 +905,35 @@ public final class ArenaManagementMenu implements Listener {
         }
     }
 
+    private void cycleRandomLootChance(Player player, String arenaId) {
+        cycleGeneralSetting(player, arenaId, "random_loot_chance",
+                List.of("0", "5", "10", "15", "20", "25", "30", "40", "50", "75", "100"),
+                "Loot-Chance");
+    }
+
+    private void cycleRandomLootDistance(Player player, String arenaId) {
+        cycleGeneralSetting(player, arenaId, "random_loot_min_distance",
+                List.of("0", "5", "10", "15", "20", "25", "30", "40", "50"),
+                "Mindestabstand");
+    }
+
+    private void cycleGeneralSetting(Player player, String arenaId, String key, List<String> options, String label) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            String current = arena.modeSetting("general", key, key.equals("random_loot_chance") ? "20" : "20");
+            int index = options.indexOf(current);
+            String next = options.get((index + 1 + options.size()) % options.size());
+            plugin.getArenaService().save(arena.withModeSetting("general", key, next));
+            player.sendMessage("§a" + label + ": §f" + next
+                    + (key.equals("random_loot_chance") ? "%" : " Blöcke"));
+            openDetails(player, arenaId);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§c" + label + " konnte nicht gespeichert werden: " + exception.getMessage());
+            openDetails(player, arenaId);
+        }
+    }
+
     private void cycleDisconnectGrace(Player player, String arenaId) {
         try {
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
@@ -1218,8 +1256,9 @@ public final class ArenaManagementMenu implements Listener {
                 }
                 return;
             }
+            if (slot == 24) { cycleRandomLootChance(player, holder.arenaId); return; }
             if (slot == 25) { toggleRandomLoot(player, holder.arenaId); return; }
-            if (slot == 26) { cycleDisconnectGrace(player, holder.arenaId); return; }
+            if (slot == 26) { cycleRandomLootDistance(player, holder.arenaId); return; }
             if (slot == 27) { openTeamLoadouts(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String spawnName = holder.spawnActions.get(slot);
