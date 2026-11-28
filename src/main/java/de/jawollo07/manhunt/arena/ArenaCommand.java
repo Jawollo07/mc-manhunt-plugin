@@ -436,6 +436,17 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
             return filter(List.of("gui", "edit", "leave", "templates", "list", "create", "duplicate", "delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn", "spawn", "bounds"), args[1]);
         }
 
+        if (args.length == 3 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("bounds")) {
+            return filter(List.of("set", "info", "clear"), args[2]);
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("bounds")) {
+            try { return filter(plugin.getArenaService().findAll().stream().map(Arena::id).toList(), args[3]); }
+            catch (SQLException exception) { return List.of(); }
+        }
+        if (args.length == 5 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("bounds")
+                && args[2].equalsIgnoreCase("set")) {
+            return filter(List.of("pos1", "pos2"), args[4]);
+        }
         if (args.length == 3 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("spawn")) {
             return filter(List.of("set", "list", "tp", "remove", "clear"), args[2]);
         }
