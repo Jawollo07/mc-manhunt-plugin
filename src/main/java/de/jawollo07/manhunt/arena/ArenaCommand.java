@@ -130,7 +130,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
     }
 
     private void bounds(CommandSender sender, String[] args) throws SQLException {
-        if (args.length < 5) {
+        if (args.length < 4) {
             sender.sendMessage("§cVerwendung: /manhunt arena bounds <set|clear|info> <arena> [pos1|pos2 <x> <y> <z>]");
             return;
         }
