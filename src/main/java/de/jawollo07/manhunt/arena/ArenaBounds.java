@@ -27,9 +27,7 @@ public record ArenaBounds(double minX, double minY, double minZ,
         }
         if (!any) return Optional.empty();
         for (String value : values) {
-            if (value == null || value.isBlank()) {
-                throw new IllegalArgumentException("Beide Eckpunkte der Arena-Begrenzung müssen vollständig gesetzt sein.");
-            }
+            if (value == null || value.isBlank()) return Optional.empty();
         }
         try {
             double x1 = Double.parseDouble(values[0]), y1 = Double.parseDouble(values[1]);
@@ -40,6 +38,15 @@ public record ArenaBounds(double minX, double minY, double minZ,
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Die gespeicherten Arena-Eckpunkte sind ungültig.", exception);
         }
+    }
+
+    public static boolean hasAny(Arena arena) {
+        return ListHolder.KEYS.stream().anyMatch(key -> !arena.modeSetting("general", key, "").isBlank());
+    }
+
+    private static final class ListHolder {
+        private static final java.util.List<String> KEYS = java.util.List.of("bounds_pos1_x", "bounds_pos1_y",
+                "bounds_pos1_z", "bounds_pos2_x", "bounds_pos2_y", "bounds_pos2_z");
     }
 
     public static ArenaBounds fromCorners(Location first, Location second) {
