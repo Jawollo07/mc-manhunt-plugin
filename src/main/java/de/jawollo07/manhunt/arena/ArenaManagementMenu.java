@@ -212,6 +212,15 @@ public final class ArenaManagementMenu implements Listener {
                         "§7Du musst dich in der Vorlagenwelt befinden."));
                 holder.spawnActions.put(10 + i, name);
             }
+            var arenaBounds = ArenaBounds.from(arena).orElse(null);
+            inventory.setItem(20, item(Material.RED_CONCRETE, "§cArena-Grenze: Ecke 1",
+                    "§7" + (arenaBounds == null ? "Noch nicht gesetzt" : "Erste Ecke gespeichert"),
+                    "§eKlicken: Deine aktuelle Position speichern",
+                    "§7Du musst dich in der Vorlagenwelt befinden."));
+            inventory.setItem(21, item(Material.GREEN_CONCRETE, "§aArena-Grenze: Ecke 2",
+                    "§7" + (arenaBounds == null ? "Noch nicht vollständig gesetzt" : "Zweite Ecke gespeichert"),
+                    "§eKlicken: Deine aktuelle Position speichern",
+                    "§7Zusammen bilden beide Ecken den Spielbereich."));
             inventory.setItem(22, item(template.valid() ? Material.LIME_CONCRETE : Material.RED_CONCRETE,
                     template.valid() ? "§aVorlage grundsätzlich verwendbar" : "§cVorlage nicht bereit",
                     "§7Gespeicherte Spawnpunkte: §f" + spawnPoints.size(),
@@ -891,6 +900,38 @@ public final class ArenaManagementMenu implements Listener {
         }
     }
 
+    private void setBoundsCorner(Player player, String arenaId, int corner) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            if (!plugin.getMapManager().isTemplateWorld(player.getWorld(), arena.worldName())) {
+                player.sendMessage("§cBetrete zuerst die Vorlagenwelt mit /manhunt arena edit "
+                        + arena.worldName() + ".");
+                return;
+            }
+            var location = player.getLocation();
+            String key = "bounds_pos" + corner + "_";
+            arena = arena.withModeSetting("general", key + "x", Integer.toString(location.getBlockX()))
+                    .withModeSetting("general", key + "y", Integer.toString(location.getBlockY()))
+                    .withModeSetting("general", key + "z", Integer.toString(location.getBlockZ()));
+            var bounds = ArenaBounds.from(arena);
+            plugin.getArenaService().save(arena);
+            player.sendMessage("§aArena-Ecke " + corner + " gespeichert: §f"
+                    + location.getBlockX() + " " + location.getBlockY() + " " + location.getBlockZ());
+            if (bounds.isPresent()) {
+                ArenaBounds b = bounds.orElseThrow();
+                player.sendMessage("§aBegrenzung vollständig: X " + b.minX() + "–" + b.maxX()
+                        + ", Y " + b.minY() + "–" + b.maxY() + ", Z " + b.minZ() + "–" + b.maxZ());
+            } else {
+                player.sendMessage("§eSetze jetzt noch die andere Ecke.");
+            }
+            openDetails(player, arenaId);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cArena-Begrenzung konnte nicht gespeichert werden: " + exception.getMessage());
+            openDetails(player, arenaId);
+        }
+    }
+
     private void toggleRandomLoot(Player player, String arenaId) {
         try {
             Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
@@ -1256,6 +1297,8 @@ public final class ArenaManagementMenu implements Listener {
                 }
                 return;
             }
+            if (slot == 20) { setBoundsCorner(player, holder.arenaId, 1); return; }
+            if (slot == 21) { setBoundsCorner(player, holder.arenaId, 2); return; }
             if (slot == 23) { cycleDisconnectGrace(player, holder.arenaId); return; }
             if (slot == 24) { cycleRandomLootChance(player, holder.arenaId); return; }
             if (slot == 25) { toggleRandomLoot(player, holder.arenaId); return; }
