@@ -75,7 +75,7 @@ public record ArenaBounds(double minX, double minY, double minZ,
         border.setCenter((minX + maxX + 1.0) / 2.0, (minZ + maxZ + 1.0) / 2.0);
         border.setSize(Math.max(1.0, Math.max(maxX - minX + 1.0, maxZ - minZ + 1.0)));
         border.setWarningDistance(0);
-        border.setDamageAmount(0.2);
+        border.setDamageAmount(0.0);
     }
 
     public Arena applyTo(Arena arena) {
