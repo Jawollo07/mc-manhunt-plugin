@@ -1,6 +1,7 @@
 package de.jawollo07.manhunt.game;
 
 import de.jawollo07.manhunt.arena.Arena;
+import de.jawollo07.manhunt.arena.ArenaBounds;
 import de.jawollo07.manhunt.arena.ArenaSpawnPoint;
 import de.jawollo07.manhunt.arena.StartInventoryData;
 import de.jawollo07.manhunt.arena.ArenaValidation;
@@ -131,6 +132,17 @@ public final class GameLifecycleService {
         try {
             if (mapManager != null && game.getMapInstance().isPresent()) {
                 World world = mapManager.getWorld(game.getMapInstance().orElseThrow());
+                ArenaBounds bounds = ArenaBounds.from(game.getArena()).orElse(null);
+                if (bounds != null) {
+                    bounds.applyWorldBorder(world);
+                    for (GamePlayer participant : game.getPlayers()) {
+                        Location spawn = resolveSpawn(game, participant, world);
+                        if (!bounds.contains(spawn)) {
+                            throw new IllegalStateException("Spawnpunkt für " + participant.getUniqueId()
+                                    + " liegt außerhalb der Arena-Begrenzung.");
+                        }
+                    }
+                }
                 for (GamePlayer participant : game.getPlayers()) {
                     playerManager.findOnlinePlayer(participant.getUniqueId()).ifPresent(player -> {
                         Location spawn = resolveSpawn(game, participant, world);
