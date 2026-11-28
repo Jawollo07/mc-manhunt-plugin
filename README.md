@@ -33,7 +33,7 @@ Ein modulares Minecraft-Manhunt-Minispiel-Plugin für Paper. Es bietet vier Spie
 
 Die genaue Konfiguration der Modi erfolgt pro Arena. Nicht jeder Modus benötigt dieselben Spawnpunkte.
 
-## Voraussetzungen
+- Loot-Pool-Editor in der Admin-GUI: Items je Arena ein- und ausschalten, seitenweise durch alle verfügbaren Minecraft-Items blättern.\n\n## Voraussetzungen
 
 - Ein Paper-Server mit einer zur verwendeten Paper-API kompatiblen Version (das Projekt wird gegen Paper API **26.3** gebaut).
 - **Java 25** auf dem Build-System; für den Serverbetrieb ist ebenfalls eine zur eingesetzten Paper-Version passende Java-Laufzeit erforderlich.
