@@ -48,6 +48,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
                 case "setspawn" -> setSpawn(sender, args);
                 case "delspawn" -> deleteSpawn(sender, args);
                 case "spawn" -> spawn(sender, args);
+                case "bounds" -> bounds(sender, args);
                 default -> sendHelp(sender, label);
             }
         } catch (SQLException | java.io.IOException exception) {
@@ -126,6 +127,60 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§6Spawnpunkte:");
             arena.spawnPoints().keySet().forEach(key -> sender.sendMessage("§e- " + key));
         }
+    }
+
+    private void bounds(CommandSender sender, String[] args) throws SQLException {
+        if (args.length < 5) {
+            sender.sendMessage("§cVerwendung: /manhunt arena bounds <set|clear|info> <arena> [pos1|pos2 <x> <y> <z>]");
+            return;
+        }
+        Arena arena = requireArena(args[3]);
+        if (args[2].equalsIgnoreCase("clear")) {
+            for (String key : List.of("bounds_pos1_x", "bounds_pos1_y", "bounds_pos1_z",
+                    "bounds_pos2_x", "bounds_pos2_y", "bounds_pos2_z")) {
+                arena = arena.withModeSetting("general", key, "");
+            }
+            plugin.getArenaService().save(arena);
+            sender.sendMessage("§aArena-Begrenzung für §e" + arena.id() + " §awurde entfernt.");
+            return;
+        }
+        if (args[2].equalsIgnoreCase("info")) {
+            var bounds = ArenaBounds.from(arena);
+            if (bounds.isEmpty()) sender.sendMessage("§eFür diese Arena ist keine Begrenzung gesetzt.");
+            else {
+                ArenaBounds b = bounds.orElseThrow();
+                sender.sendMessage("§6Arena-Grenzen: §eX " + b.minX() + " bis " + b.maxX()
+                        + " §7| §eY " + b.minY() + " bis " + b.maxY()
+                        + " §7| §eZ " + b.minZ() + " bis " + b.maxZ());
+            }
+            return;
+        }
+        if (!args[2].equalsIgnoreCase("set") || args.length < 9) {
+            throw new IllegalArgumentException("Verwendung: /manhunt arena bounds set <arena> <pos1|pos2> <x> <y> <z>");
+        }
+        String corner = args[4].toLowerCase(Locale.ROOT);
+        if (!corner.equals("pos1") && !corner.equals("pos2")) {
+            throw new IllegalArgumentException("Eckpunkt muss pos1 oder pos2 sein.");
+        }
+        double x, y, z;
+        try {
+            x = Double.parseDouble(args[5]);
+            y = Double.parseDouble(args[6]);
+            z = Double.parseDouble(args[7]);
+            if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) throw new NumberFormatException();
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("X, Y und Z müssen gültige Zahlen sein.");
+        }
+        arena = arena.withModeSetting("general", "bounds_" + corner + "_x", Double.toString(x))
+                .withModeSetting("general", "bounds_" + corner + "_y", Double.toString(y))
+                .withModeSetting("general", "bounds_" + corner + "_z", Double.toString(z));
+        var bounds = ArenaBounds.from(arena);
+        plugin.getArenaService().save(arena);
+        sender.sendMessage("§a" + corner.toUpperCase(Locale.ROOT) + " für §e" + arena.id()
+                + " §agespeichert: §f" + x + " " + y + " " + z);
+        bounds.ifPresent(b -> sender.sendMessage("§aBegrenzung vollständig: X "
+                + b.minX() + "–" + b.maxX() + ", Y " + b.minY() + "–" + b.maxY()
+                + ", Z " + b.minZ() + "–" + b.maxZ()));
     }
 
     private void setSpawn(CommandSender sender, String[] args) throws SQLException {
@@ -369,6 +424,8 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/" + label + " arena spawn tp|remove <arena> <team> <nummer>");
         sender.sendMessage("§e/" + label + " arena spawn clear <arena> <team>");
         sender.sendMessage("§e/" + label + " arena delspawn <id> <spawnname>");
+        sender.sendMessage("§e/" + label + " arena bounds set <arena> <pos1|pos2> <x> <y> <z>");
+        sender.sendMessage("§e/" + label + " arena bounds info|clear <arena>");
     }
 
     @Override
@@ -376,7 +433,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
         if (!sender.hasPermission("manhunt.admin")) return List.of();
         if (args.length == 1) return filter(List.of("arena"), args[0]);
         if (args.length == 2 && args[0].equalsIgnoreCase("arena")) {
-            return filter(List.of("gui", "edit", "leave", "templates", "list", "create", "duplicate", "delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn", "spawn"), args[1]);
+            return filter(List.of("gui", "edit", "leave", "templates", "list", "create", "duplicate", "delete", "info", "validate", "rename", "settemplate", "setspawn", "delspawn", "spawn", "bounds"), args[1]);
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("arena") && args[1].equalsIgnoreCase("spawn")) {
