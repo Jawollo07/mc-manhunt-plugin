@@ -85,6 +85,10 @@ public final class GameLifecycleService {
             throw new IllegalStateException("Not enough players to prepare this game");
         }
 
+        if (ArenaBounds.hasAny(game.getArena()) && ArenaBounds.from(game.getArena()).isEmpty()) {
+            throw new IllegalStateException("Die Arena-Begrenzung ist unvollständig. Setze beide Eckpunkte oder entferne die Begrenzung.");
+        }
+
         ArenaValidation spawnValidation = ArenaValidation.check(game.getArena(), game.getMode(), true, false);
         if (!spawnValidation.ready()) {
             throw new IllegalStateException(String.join(" ", spawnValidation.errors()));
