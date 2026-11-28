@@ -232,7 +232,7 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Abstand zur nächsten bereits ausgewählten",
                     "§7Loot-Truhe (0 = kein Mindestabstand).",
                     "§eKlicken: Nächsten Wert einstellen"));
-            inventory.setItem(27, item(Material.CLOCK, "§eDisconnect-Kulanz ändern",
+            inventory.setItem(23, item(Material.CLOCK, "§eDisconnect-Kulanz ändern",
                     "§7Aktuell: §f" + settingValueLabel("disconnect_grace_seconds",
                             arena.modeSetting("general", "disconnect_grace_seconds", "60")),
                     "§7Nach Ablauf werden getrennte Spieler",
@@ -1256,6 +1256,7 @@ public final class ArenaManagementMenu implements Listener {
                 }
                 return;
             }
+            if (slot == 23) { cycleDisconnectGrace(player, holder.arenaId); return; }
             if (slot == 24) { cycleRandomLootChance(player, holder.arenaId); return; }
             if (slot == 25) { toggleRandomLoot(player, holder.arenaId); return; }
             if (slot == 26) { cycleRandomLootDistance(player, holder.arenaId); return; }
