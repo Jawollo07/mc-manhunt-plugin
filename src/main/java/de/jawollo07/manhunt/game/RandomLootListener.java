@@ -1,6 +1,7 @@
 package de.jawollo07.manhunt.game;
 
 import de.jawollo07.manhunt.ManHuntPlugin;
+import de.jawollo07.manhunt.arena.ArenaBounds;
 import org.bukkit.Material;
 import org.bukkit.block.Container;
 import org.bukkit.block.Chest;
@@ -55,6 +56,17 @@ public final class RandomLootListener implements Listener {
 
         var mapInstance = game.getMapInstance().orElse(null);
         if (mapInstance == null || !mapInstance.worldName().equals(event.getWorld().getName())) return;
+
+        ArenaBounds bounds;
+        try {
+            bounds = ArenaBounds.from(game.getArena()).orElse(null);
+        } catch (IllegalArgumentException exception) {
+            plugin.getLogger().warning("Invalid arena bounds; skipping random loot: " + exception.getMessage());
+            return;
+        }
+        var chestLocation = chest.getBlock().getLocation();
+        if (bounds != null && !bounds.contains(chestLocation.getBlockX(), chestLocation.getBlockY(),
+                chestLocation.getBlockZ())) return;
 
         UUID worldId = event.getWorld().getUID();
         if (!worldId.equals(selectedWorldId)) {
