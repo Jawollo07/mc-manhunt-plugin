@@ -25,7 +25,13 @@ public final class ArenaBoundsListener implements Listener {
         if (game == null || !game.isRunning()
                 || game.getPlayer(event.getPlayer().getUniqueId()).isEmpty()) return;
         var mapInstance = game.getMapInstance().orElse(null);
-        if (mapInstance == null || !mapInstance.worldName().equals(event.getTo().getWorld().getName())) return;
+        if (mapInstance == null || !mapInstance.worldName().equals(event.getFrom().getWorld().getName())) return;
+        if (event.getTo().getWorld() == null
+                || !mapInstance.worldName().equals(event.getTo().getWorld().getName())) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(net.kyori.adventure.text.Component.text("§cDu kannst die Arena nicht verlassen."));
+            return;
+        }
 
         ArenaBounds bounds;
         try {
