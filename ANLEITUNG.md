@@ -113,6 +113,12 @@ Alternativ per Befehl mit Koordinaten:
 
 Die Begrenzung wird pro Arena gespeichert. Die sichtbare Minecraft-WorldBorder ist technisch quadratisch; die tatsächliche Bewegungssperre wird zusätzlich exakt rechteckig und auch vertikal durchgesetzt.
 
+### Random Loot konfigurieren
+
+Öffne die Arena-Details über `/manhunt arena gui`. Dort findest du „Random-Loot-Pool bearbeiten“. Im Editor kannst du jedes verfügbare Minecraft-Item durch Anklicken in den Pool aufnehmen oder daraus entfernen. Die Auswahl wird sofort und separat für diese Arena gespeichert. Die grünen Einträge sind aktiv, rote Einträge werden nicht als Random Loot verwendet. Über die Pfeile blätterst du durch die Item-Seiten.
+
+„Standard-Pool wiederherstellen“ setzt die ursprüngliche Auswahl zurück. Wenn du alle Items entfernst, bleibt der normale Truheninhalt erhalten und es wird kein eigener Random Loot eingesetzt. Loot-Chance und Mindestabstand stellst du weiterhin direkt in den Arena-Details ein. Der Pool wird nur bei aktiviertem Random Loot und innerhalb der Arena-Begrenzung verwendet.
+
 ### Schritt 6 – Team-Startinventare
 
 Für jedes Team kannst du ein eigenes Startinventar festlegen. Wähle das Team aus und bearbeite das Inventar direkt im geöffneten Menü:
