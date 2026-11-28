@@ -12,7 +12,7 @@ Ein modulares Minecraft-Manhunt-Minispiel-Plugin für Paper. Es bietet vier Spie
 - Schnelles Rematch mit derselben Arena, demselben Modus und den zuvor teilnehmenden Online-Spielern.
 - Zuschauer können über die Spielerübersicht aktive Spieler verfolgen.
 - Admin-GUI zur Modus- und Arena-Auswahl, Spielerverwaltung und Steuerung der Runde.
-- Geführtes Arena-Setup mit Kartenvorlagen, Spawnpunkten, Modusfreigaben und Abschlussprüfung.
+- Geführtes Arena-Setup mit Kartenvorlagen, Spawnpunkten, optionalen 3D-Arena-Grenzen (zwei Eckpunkte) und Abschlussprüfung.
 - Mehrere Spawnpunkte pro Team; die Zuordnung kann zufällig verteilt werden.
 - Modusbezogene Arena-Einstellungen, zum Beispiel Zeitlimit, Teamgrößen und Fähigkeiten.
 - Eigene Startinventare pro Team und Arena – inklusive Items, Rüstung und Schildhand, direkt über die Ingame-GUI.
