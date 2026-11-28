@@ -16,6 +16,7 @@ Ein modulares Minecraft-Manhunt-Minispiel-Plugin für Paper. Es bietet vier Spie
 - Mehrere Spawnpunkte pro Team; die Zuordnung kann zufällig verteilt werden.
 - Modusbezogene Arena-Einstellungen, zum Beispiel Zeitlimit, Teamgrößen und Fähigkeiten.
 - Eigene Startinventare pro Team und Arena – inklusive Items, Rüstung und Schildhand, direkt über die Ingame-GUI.
+- Konfigurierbarer Random-Loot-Pool pro Arena: verfügbare Items in der GUI ein- und ausschalten, mit eigener Loot-Chance und Mindestabstand.
 - Temporäre Arbeitskopien der Karten; die Kartenvorlage bleibt unverändert.
 - Wiederherstellung der Spielerzustände nach einer Runde.
 - SQLite-Datenspeicherung für Arenen, Einstellungen und Statistiken.
