@@ -2,8 +2,6 @@ package de.jawollo07.manhunt.arena;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,12 +18,12 @@ class ArenaBoundsTest {
 
         ArenaBounds bounds = ArenaBounds.from(arena).orElseThrow();
 
-        assertEquals(100, bounds.minX());
-        assertEquals(200, bounds.maxX());
-        assertEquals(21, bounds.minY());
-        assertEquals(64, bounds.maxY());
-        assertEquals(100, bounds.minZ());
-        assertEquals(784, bounds.maxZ());
+        assertEquals(100.0, bounds.minX(), 0.001);
+        assertEquals(200.0, bounds.maxX(), 0.001);
+        assertEquals(21.0, bounds.minY(), 0.001);
+        assertEquals(64.0, bounds.maxY(), 0.001);
+        assertEquals(100.0, bounds.minZ(), 0.001);
+        assertEquals(784.0, bounds.maxZ(), 0.001);
         assertTrue(bounds.contains(100, 21, 100));
         assertTrue(bounds.contains(200.9, 64.9, 784.9));
         assertFalse(bounds.contains(201.1, 40, 400));
