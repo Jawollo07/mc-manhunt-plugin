@@ -111,6 +111,7 @@ public final class ManHuntPlugin extends JavaPlugin {
         );
 
         getServer().getPluginManager().registerEvents(new RandomLootListener(this, gameManager), this);
+        getServer().getPluginManager().registerEvents(new de.jawollo07.manhunt.game.ArenaBoundsListener(gameManager), this);
 
         arenaManagementMenu = new ArenaManagementMenu(this);
         getServer().getPluginManager().registerEvents(arenaManagementMenu, this);
