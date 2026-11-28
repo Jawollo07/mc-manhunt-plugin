@@ -155,7 +155,7 @@ public final class ArenaCommand implements CommandExecutor, TabCompleter {
             }
             return;
         }
-        if (!args[2].equalsIgnoreCase("set") || args.length < 9) {
+        if (!args[2].equalsIgnoreCase("set") || args.length < 8) {
             throw new IllegalArgumentException("Verwendung: /manhunt arena bounds set <arena> <pos1|pos2> <x> <y> <z>");
         }
         String corner = args[4].toLowerCase(Locale.ROOT);
