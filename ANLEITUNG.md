@@ -98,6 +98,21 @@ Benötigte Teams:
 
 Bei Hitman kann zusätzlich ein **Evakuierungspunkt** gesetzt werden. Er ist optional und wird nur benötigt, wenn die Evakuierung in den Hitman-Einstellungen aktiviert ist.
 
+### Arena-Begrenzung (optional)
+
+In den Arena-Details kannst du zwei Ecken direkt über die GUI setzen: Betrete zuerst die Vorlagenwelt und klicke auf „Arena-Grenze: Ecke 1“ und „Arena-Grenze: Ecke 2“. Die beiden Positionen bilden einen rechteckigen, dreidimensionalen Spielbereich. Spieler können die Arena während der Runde nicht verlassen; Spawnpunkte außerhalb der gesetzten Grenzen verhindern den Rundenstart.
+
+Alternativ per Befehl mit Koordinaten:
+
+```text
+/manhunt arena bounds set <arena> pos1 200 64 100
+/manhunt arena bounds set <arena> pos2 100 21 784
+/manhunt arena bounds info <arena>
+/manhunt arena bounds clear <arena>
+```
+
+Die Begrenzung wird pro Arena gespeichert. Die sichtbare Minecraft-WorldBorder ist technisch quadratisch; die tatsächliche Bewegungssperre wird zusätzlich exakt rechteckig und auch vertikal durchgesetzt.
+
 ### Schritt 6 – Team-Startinventare
 
 Für jedes Team kannst du ein eigenes Startinventar festlegen. Wähle das Team aus und bearbeite das Inventar direkt im geöffneten Menü:
