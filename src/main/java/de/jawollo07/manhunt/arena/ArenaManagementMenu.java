@@ -2,6 +2,7 @@ package de.jawollo07.manhunt.arena;
 
 import de.jawollo07.manhunt.ManHuntPlugin;
 import de.jawollo07.manhunt.game.Game;
+import de.jawollo07.manhunt.game.RandomLootPool;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -247,6 +248,11 @@ public final class ArenaManagementMenu implements Listener {
                     "§7Nach Ablauf werden getrennte Spieler",
                     "§7automatisch als ausgeschieden gewertet.",
                     "§eKlicken: Nächsten Wert einstellen"));
+            inventory.setItem(18, item(Material.HOPPER, "§6Random-Loot-Pool bearbeiten",
+                    "§7Lege fest, welche Items in den",
+                    "§7Loot-Truhen dieser Arena erscheinen dürfen.",
+                    "§7Ausgewählt: §f" + RandomLootPool.parse(arena.modeSetting("general", "random_loot_pool", "")).size(),
+                    "§eKlicken zum Bearbeiten"));
             inventory.setItem(27, item(Material.CHEST, "§6Team-Startinventare",
                     "§7Lege für jedes Team eigene Startitems fest.",
                     "§7Items, Rüstung und Schildhand werden gespeichert.",
@@ -286,6 +292,77 @@ public final class ArenaManagementMenu implements Listener {
         } catch (SQLException | IllegalArgumentException exception) {
             player.sendMessage("§cArena-Details konnten nicht geladen werden: " + exception.getMessage());
             openArenaList(player);
+        }
+    }
+
+    private void openRandomLootPool(Player player, String arenaId, int page) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            var selected = RandomLootPool.parse(arena.modeSetting("general", "random_loot_pool", ""));
+            List<Material> available = RandomLootPool.availableItems();
+            int pageSize = 34;
+            int pageCount = Math.max(1, (available.size() + pageSize - 1) / pageSize);
+            int currentPage = Math.max(0, Math.min(page, pageCount - 1));
+            MenuHolder holder = new MenuHolder(Screen.RANDOM_LOOT_POOL, arenaId, null, currentPage);
+            Inventory inventory = inventory(holder, "Random Loot • Item-Pool (" + (currentPage + 1) + "/" + pageCount + ")");
+            inventory.setItem(4, item(Material.HOPPER, "§6Loot-Pool der Arena",
+                    "§7Ausgewählt: §f" + selected.size() + " §7von §f" + available.size(),
+                    "§aGrün = im Pool §7| §cRot = nicht im Pool",
+                    "§7Klicke ein Item an, um es ein-/auszuschalten.",
+                    "§7Änderungen werden sofort gespeichert."));
+            int slot = 10;
+            int start = currentPage * pageSize;
+            for (Material material : available.subList(start, Math.min(start + pageSize, available.size()))) {
+                boolean enabled = selected.contains(material);
+                holder.entries.put(slot, material.name());
+                String label = material.name().toLowerCase(Locale.ROOT).replace('_', ' ');
+                inventory.setItem(slot++, item(material,
+                        (enabled ? "§a✓ " : "§c✗ ") + label,
+                        enabled ? "§aWird als Random Loot verwendet" : "§cNicht im Loot-Pool",
+                        "§eKlicken zum Umschalten"));
+            }
+            inventory.setItem(45, item(Material.ARROW, "§eZurück zu den Arena-Details"));
+            if (currentPage > 0) inventory.setItem(48, item(Material.ARROW, "§eVorherige Seite"));
+            inventory.setItem(49, item(Material.CHEST, "§eStandard-Pool wiederherstellen",
+                    "§7Setzt die ursprüngliche Auswahl zurück."));
+            if (currentPage + 1 < pageCount) inventory.setItem(50, item(Material.ARROW, "§eNächste Seite"));
+            inventory.setItem(53, item(Material.BARRIER, "§cSchließen"));
+            player.openInventory(inventory);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cLoot-Pool konnte nicht geöffnet werden: " + exception.getMessage());
+            openDetails(player, arenaId);
+        }
+    }
+
+    private void toggleRandomLootPoolItem(Player player, String arenaId, String materialName, int page) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            Material material = Material.valueOf(materialName);
+            var selected = new java.util.LinkedHashSet<>(RandomLootPool.parse(
+                    arena.modeSetting("general", "random_loot_pool", "")));
+            if (!selected.add(material)) selected.remove(material);
+            plugin.getArenaService().save(arena.withModeSetting("general", "random_loot_pool",
+                    RandomLootPool.encode(selected)));
+            openRandomLootPool(player, arenaId, page);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cLoot-Pool konnte nicht geändert werden: " + exception.getMessage());
+            openRandomLootPool(player, arenaId, page);
+        }
+    }
+
+    private void resetRandomLootPool(Player player, String arenaId) {
+        try {
+            Arena arena = plugin.getArenaService().find(arenaId).orElseThrow(
+                    () -> new IllegalStateException("Arena nicht gefunden."));
+            plugin.getArenaService().save(arena.withModeSetting("general", "random_loot_pool",
+                    RandomLootPool.encode(new java.util.LinkedHashSet<>(RandomLootPool.defaults()))));
+            player.sendMessage("§aDer Standard-Loot-Pool wurde wiederhergestellt.");
+            openRandomLootPool(player, arenaId, 0);
+        } catch (SQLException | IllegalArgumentException | IllegalStateException exception) {
+            player.sendMessage("§cStandard-Pool konnte nicht wiederhergestellt werden: " + exception.getMessage());
+            openRandomLootPool(player, arenaId, 0);
         }
     }
 
@@ -1303,6 +1380,7 @@ public final class ArenaManagementMenu implements Listener {
             if (slot == 24) { cycleRandomLootChance(player, holder.arenaId); return; }
             if (slot == 25) { toggleRandomLoot(player, holder.arenaId); return; }
             if (slot == 26) { cycleRandomLootDistance(player, holder.arenaId); return; }
+            if (slot == 18) { openRandomLootPool(player, holder.arenaId, 0); return; }
             if (slot == 27) { openTeamLoadouts(player, holder.arenaId); return; }
             if (slot == 53) { player.closeInventory(); return; }
             String spawnName = holder.spawnActions.get(slot);
@@ -1341,6 +1419,17 @@ public final class ArenaManagementMenu implements Listener {
                         player.sendMessage("§cSpawnpunkt konnte nicht getestet werden: " + exception.getMessage());
                     }
                 } else openConfirm(player, holder.arenaId, spawnName);
+            }
+        } else if (holder.screen == Screen.RANDOM_LOOT_POOL) {
+            if (slot == 45) { openDetails(player, holder.arenaId); return; }
+            if (slot == 48) { openRandomLootPool(player, holder.arenaId, holder.page - 1); return; }
+            if (slot == 49) { resetRandomLootPool(player, holder.arenaId); return; }
+            if (slot == 50) { openRandomLootPool(player, holder.arenaId, holder.page + 1); return; }
+            if (slot == 53) { player.closeInventory(); return; }
+            String materialName = holder.entries.get(slot);
+            if (materialName != null) {
+                toggleRandomLootPoolItem(player, holder.arenaId, materialName, holder.page);
+                return;
             }
         } else if (holder.screen == Screen.LOADOUT_TEAMS) {
             if (slot == 45) { openDetails(player, holder.arenaId); return; }
@@ -1468,7 +1557,7 @@ public final class ArenaManagementMenu implements Listener {
         return stack;
     }
 
-    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, MODE_SETUP, MODE_SETTINGS, REVIEW, DETAILS, LOADOUT_TEAMS, LOADOUT_EDITOR, CONFIRM }
+    private enum Screen { ARENAS, TEMPLATES, TEMPLATE_DETAILS, SETUP, TEAM_SETUP, MODE_SETUP, MODE_SETTINGS, REVIEW, DETAILS, RANDOM_LOOT_POOL, LOADOUT_TEAMS, LOADOUT_EDITOR, CONFIRM }
     private enum InputAction { RENAME, CHANGE_TEMPLATE, DUPLICATE }
     private record PendingInput(String arenaId, InputAction action) { }
 
